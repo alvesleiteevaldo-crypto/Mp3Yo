@@ -5,6 +5,7 @@ O aplicativo original permanece em main.py, sem modificações.
 
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -17,6 +18,7 @@ import yt_dlp
 
 
 FORMATS = ("mp3", "m4a", "opus", "flac", "wav")
+MP3_QUALITIES = ("192", "256", "320")
 MAX_LINKS = 30
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 CONFIG_DIR = Path(os.environ.get("APPDATA", Path.home())) / "YoutuberAudioDownloader"
@@ -46,7 +48,13 @@ def ffmpeg_location():
     raise FileNotFoundError(f"FFmpeg não encontrado. Instale-o ou coloque {name} em bin/.")
 
 
-def options_for(folder, audio_format, progress_hook):
+def youtube_links(text):
+    candidates = re.findall(r"https?://[^\s<>\"']+", text)
+    return [url for candidate in candidates
+            if valid_url(url := candidate.rstrip(".,;)]}"))]
+
+
+def options_for(folder, audio_format, progress_hook, mp3_quality="192"):
     return {
         "format": "bestaudio/best",
         "noplaylist": True,
@@ -55,7 +63,7 @@ def options_for(folder, audio_format, progress_hook):
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": audio_format,
-            "preferredquality": "192" if audio_format == "mp3" else "0",
+            "preferredquality": mp3_quality if audio_format == "mp3" else "0",
         }],
         "progress_hooks": [progress_hook],
         "quiet": True,
@@ -68,7 +76,7 @@ class App:
         self.root = root
         self.running = False
         root.title("YouTube Audio Downloader — fila de até 30 links")
-        root.geometry("760x650")
+        root.geometry("760x700")
         root.configure(bg="#333333")
         frame = tk.Frame(root, bg="#333333", padx=20, pady=15)
         frame.pack(fill="both", expand=True)
@@ -79,12 +87,23 @@ class App:
         label("Links do YouTube (um por linha; máximo de 30):")
         self.links = tk.Text(frame, height=17, wrap="none")
         self.links.pack(fill="both", expand=True, pady=(5, 12))
+        self.auto_clipboard = tk.BooleanVar(value=True)
+        tk.Checkbutton(frame, text="Adicionar automaticamente links copiados (sem iniciar download)",
+                       variable=self.auto_clipboard, bg="#333333", fg="white",
+                       selectcolor="#333333", activebackground="#333333",
+                       activeforeground="white").pack(anchor="w", pady=(0, 8))
+        self.last_clipboard = None
         row = tk.Frame(frame, bg="#333333")
         row.pack(fill="x")
         tk.Label(row, text="Formato de saída:", bg="#333333", fg="white").pack(side="left")
         self.audio_format = tk.StringVar(value="mp3")
         ttk.Combobox(row, textvariable=self.audio_format, values=FORMATS,
                      state="readonly", width=10).pack(side="left", padx=10)
+        tk.Label(row, text="Qualidade MP3:", bg="#333333", fg="white").pack(side="left", padx=(15, 0))
+        self.mp3_quality = tk.StringVar(value="192")
+        ttk.Combobox(row, textvariable=self.mp3_quality, values=MP3_QUALITIES,
+                     state="readonly", width=8).pack(side="left", padx=10)
+        label("192/256/320 kbps para MP3; outros formatos usam o melhor áudio disponível.")
         label("Pasta de destino:")
         folder_row = tk.Frame(frame, bg="#333333")
         folder_row.pack(fill="x", pady=(5, 12))
@@ -102,6 +121,25 @@ class App:
         label_status.pack(fill="x", pady=8)
         self.log = tk.Text(frame, height=6, state="disabled", wrap="word")
         self.log.pack(fill="both")
+        self.root.after(800, self.poll_clipboard)
+
+    def poll_clipboard(self):
+        try:
+            copied = self.root.clipboard_get()
+            if copied != self.last_clipboard:
+                self.last_clipboard = copied
+                if self.auto_clipboard.get():
+                    existing = [line.strip() for line in self.links.get("1.0", "end").splitlines()]
+                    new = [url for url in youtube_links(copied) if url not in existing]
+                    for url in new[:max(0, MAX_LINKS - len([u for u in existing if u]))]:
+                        self.links.insert("end", url + "\n")
+                        existing.append(url)
+                    if new:
+                        self.status.set("Links copiados adicionados à lista. Escolha o formato e clique em Converter.")
+        except (tk.TclError, UnicodeError):
+            pass
+        finally:
+            self.root.after(800, self.poll_clipboard)
 
     @staticmethod
     def load_folder():
@@ -136,6 +174,9 @@ class App:
         if self.audio_format.get() not in FORMATS:
             messagebox.showwarning("Formato", "Selecione um formato de áudio válido.")
             return
+        if self.mp3_quality.get() not in MP3_QUALITIES:
+            messagebox.showwarning("Qualidade", "Selecione uma qualidade MP3 válida.")
+            return
         if not os.path.isdir(folder):
             messagebox.showwarning("Pasta", "Selecione uma pasta de destino existente.")
             return
@@ -151,9 +192,10 @@ class App:
         self.progress.configure(value=0)
         self.report(f"Iniciando {len(urls)} link(s) em {self.audio_format.get().upper()}.")
         threading.Thread(target=self.worker,
-                         args=(urls, folder, self.audio_format.get(), binary), daemon=True).start()
+                         args=(urls, folder, self.audio_format.get(), binary,
+                               self.mp3_quality.get()), daemon=True).start()
 
-    def worker(self, urls, folder, audio_format, binary):
+    def worker(self, urls, folder, audio_format, binary, mp3_quality="192"):
         successes = 0
         failures = 0
         for index, url in enumerate(urls, 1):
@@ -170,7 +212,7 @@ class App:
                         f"{n}/{len(urls)}: convertendo para {audio_format.upper()}..."))
 
             try:
-                opts = options_for(folder, audio_format, hook)
+                opts = options_for(folder, audio_format, hook, mp3_quality)
                 opts["ffmpeg_location"] = binary
                 with yt_dlp.YoutubeDL(opts) as downloader:
                     downloader.download([url])
