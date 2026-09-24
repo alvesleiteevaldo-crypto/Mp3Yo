@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - "main_batch.py"
+      - "main_disc.py"
+      - "disc_tools.py"
       - "preparar_windows.py"
       - ".github/workflows/windows-exe.yml"
   workflow_dispatch:
@@ -23,7 +25,7 @@ jobs:
       - name: Prepare FFmpeg
         run: python preparar_windows.py
       - name: Build single-file Windows executable
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name AudioDownloaderFila --add-binary "bin/ffmpeg.exe;bin" main_batch.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name AudioDownloaderFila --add-binary "bin/ffmpeg.exe;bin" main_disc.py
       - name: Validate executable
         shell: pwsh
         run: |
