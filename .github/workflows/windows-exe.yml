@@ -1,0 +1,38 @@
+name: Build Windows EXE
+on:
+  push:
+    branches: [main]
+    paths:
+      - "main_batch.py"
+      - "preparar_windows.py"
+      - ".github/workflows/windows-exe.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip yt-dlp imageio-ffmpeg pyinstaller
+      - name: Prepare FFmpeg
+        run: python preparar_windows.py
+      - name: Build single-file Windows executable
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name AudioDownloaderFila --add-binary "bin/ffmpeg.exe;bin" main_batch.py
+      - name: Validate executable
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/AudioDownloaderFila.exe")) { throw "EXE missing" }
+          $bytes = [System.IO.File]::ReadAllBytes("dist/AudioDownloaderFila.exe")
+          if ($bytes.Length -lt 10000000 -or $bytes[0] -ne 77 -or $bytes[1] -ne 90) { throw "Invalid Windows executable" }
+          Write-Host "Windows EXE size: $($bytes.Length) bytes"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AudioDownloaderFila-Windows10
+          path: dist/AudioDownloaderFila.exe
+          if-no-files-found: error
