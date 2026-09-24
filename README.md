@@ -20,6 +20,12 @@ py main_batch.py
 
 Cole até 30 links, um por linha. Escolha MP3, M4A, Opus, FLAC ou WAV,
 selecione uma pasta e clique em **Converter links em sequência**.
+Ao copiar um ou vários links do YouTube enquanto o aplicativo estiver aberto,
+eles entram automaticamente na lista (sem iniciar o download). É possível
+desligar essa função na caixa de seleção da interface.
+Para MP3, escolha 192, 256 ou 320 kbps. O aplicativo usa a melhor fonte
+disponível; escolher 320 kbps não recupera qualidade que não exista no áudio
+original. FLAC e WAV também não tornam uma fonte comprimida sem perdas.
 Cada link termina (ou falha) antes de começar o seguinte. O resumo mostra
 quantos deram certo. Links de playlists são tratados como um único vídeo.
 
