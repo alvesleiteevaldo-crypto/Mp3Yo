@@ -29,6 +29,7 @@ except Exception:
 FORMATS = ("mp3", "m4a", "opus", "flac", "wav")
 OUTPUT_TYPES = ("Áudio MP3", "Vídeo MP4", "Vídeo AVI", "Vídeo MKV", "Vídeo MOV", "Áudio avançado")
 MP3_QUALITIES = ("192", "256", "320")
+VIDEO_QUALITIES = ("360p", "480p", "720p", "1080p", "1440p", "2160p")
 MAX_LINKS = 1000
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 CONFIG_DIR = Path(os.environ.get("APPDATA", Path.home())) / "YoutuberAudioDownloader"
@@ -209,7 +210,7 @@ def unique_links(urls):
     return result
 
 
-def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=None, output_type="Áudio MP3"):
+def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=None, output_type="Áudio MP3", video_quality="1080p"):
     options = {
         "noplaylist": True,
         "outtmpl": str(Path(folder) / "%(title).180B [%(id)s].%(ext)s"),
@@ -221,8 +222,12 @@ def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=Non
     }
     if output_type.startswith("Vídeo "):
         target = output_type.split()[-1].lower()
+        try:
+            max_height = int(str(video_quality).lower().replace("p", ""))
+        except ValueError:
+            max_height = 1080
         options.update({
-            "format": "bestvideo*+bestaudio/best",
+            "format": f"bestvideo*[height<={max_height}]+bestaudio/best[height<={max_height}]/best",
             "merge_output_format": "mkv" if target in ("avi", "mov") else target,
         })
         if target in ("avi", "mov"):
@@ -666,6 +671,14 @@ class App:
         raw = self.links.get("1.0", "end")
         urls = unique_links(youtube_links(raw))
         folder = self.folder.get().strip()
+        if self.output_type.get().startswith("Vídeo "):
+            playlist_urls = [u for u in urls if is_playlist_url(u)]
+            if playlist_urls:
+                messagebox.showwarning(
+                    "Playlist em vídeo",
+                    "No modo vídeo, use links individuais do YouTube. Playlists não são baixadas nesse modo."
+                )
+                return
         if not urls:
             messagebox.showwarning("Links", "Não encontrei links válidos do YouTube, TikTok ou Facebook no texto.")
             return
@@ -703,11 +716,12 @@ class App:
             selected_label = self.audio_format.get().upper()
         self.report(f"Lendo {len(urls)} link(s) em {selected_label}.")
         self.report("Acesso selecionado: " + self.browser.get())
+        video_quality = getattr(self, "video_quality", tk.StringVar(value="1080p")).get()
         threading.Thread(target=self.worker,
                          args=(urls, folder, self.audio_format.get(), binary,
-                               self.mp3_quality.get(), auth, self.output_type.get()), daemon=True).start()
+                               self.mp3_quality.get(), auth, self.output_type.get(), video_quality), daemon=True).start()
 
-    def worker(self, urls, folder, audio_format, binary, mp3_quality="192", auth=None, output_type="Áudio MP3"):
+    def worker(self, urls, folder, audio_format, binary, mp3_quality="192", auth=None, output_type="Áudio MP3", video_quality="1080p"):
         successes = 0
         failures = 0
         skipped = 0
@@ -801,9 +815,10 @@ class App:
                     social_download_media(
                         url, folder, output_type, mp3_quality, binary, hook,
                         stop_check=lambda: self.stop_requested,
+                        video_quality=video_quality,
                     )
                 else:
-                    opts = options_for(folder, audio_format, hook, mp3_quality, auth, output_type)
+                    opts = options_for(folder, audio_format, hook, mp3_quality, auth, output_type, video_quality)
                     opts["ffmpeg_location"] = binary
                     with yt_dlp.YoutubeDL(opts) as downloader:
                         result = downloader.download([url])
