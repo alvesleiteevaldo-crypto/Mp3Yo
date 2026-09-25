@@ -1,4 +1,4 @@
-name: Windows portátil - YoutubeDownloader PT-BR
+name: FluxMidia Windows 10-11
 
 on:
   push:
@@ -77,21 +77,22 @@ jobs:
       - name: Gerar modulo redes sociais portátil sem alterar o motor YouTube
         shell: pwsh
         run: |
-          py -m pip install --upgrade pip
-          py -m pip install pyinstaller yt-dlp
-          py -m py_compile "$PWD/main_multisite.py"
-          py -m PyInstaller --noconfirm --clean --onefile --windowed --name RedesSociaisDownloader --icon "$PWD/app_icon.ico" --collect-all yt_dlp --add-binary "$PWD/package/utils/ffmpeg.exe;bin" "$PWD/main_multisite.py"
-          Copy-Item "$PWD/dist/RedesSociaisDownloader.exe" "$PWD/package/RedesSociaisDownloader.exe" -Force
-          Copy-Item "$PWD/dist/RedesSociaisDownloader.exe" "$PWD/package/TikTokDownloader.exe" -Force
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller yt-dlp pillow
+          python "$PWD/tools/generate_fluxmidia_icon.py"
+          python -m py_compile "$PWD/main_multisite.py" "$PWD/disc_tools.py"
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name FluxMidia --icon "$PWD/app_icon.ico" --collect-all yt_dlp --add-binary "$PWD/package/utils/ffmpeg.exe;bin" "$PWD/main_multisite.py"
+          Copy-Item "$PWD/dist/FluxMidia.exe" "$PWD/package/FluxMidia.exe" -Force
+          Copy-Item "$PWD/dist/FluxMidia.exe" "$PWD/package/RedesSociaisDownloader.exe" -Force
 
           @"
           MODULO DE REDES SOCIAIS
           -----------------------
-          Abra RedesSociaisDownloader.exe para YouTube, TikTok e Facebook.
+          Abra FluxMidia.exe para YouTube, TikTok, Facebook e CD/DVD.
           Ao copiar um link compativel, ele aparece automaticamente na lista.
           Escolha Audio ou Video MP4 antes de iniciar.
           A fila aceita ate 1000 links e ignora repetidos.
-          TikTokDownloader.exe foi mantido por compatibilidade e abre o mesmo modulo.
+          O botão Converte CD/DVD abre uma segunda interface integrada, adaptada das funções úteis do K3b para Windows.
           O motor principal do YouTube/playlist permanece separado e intacto.
 
           Use apenas videos que voce tenha permissao para baixar.
@@ -126,15 +127,15 @@ jobs:
           Push-Location "$PWD/installer"
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "ConversorEvaldo.iss"
           Pop-Location
-          $setup = Get-ChildItem "$PWD/installer" -Filter "Converte-MP3-Sem-Limite-Evaldo-Setup-Windows10-11-x64.exe" | Select-Object -First 1
+          $setup = Get-ChildItem "$PWD/installer" -Filter "FluxMidia-Setup-Windows10-11-x64.exe" | Select-Object -First 1
           if (-not $setup) { throw "Instalador EXE não foi gerado." }
-          Copy-Item $setup.FullName "$PWD/Converte-MP3-Sem-Limite-Evaldo-Setup-Windows10-11-x64.exe" -Force
+          Copy-Item $setup.FullName "$PWD/FluxMidia-Setup-Windows10-11-x64.exe" -Force
 
       - name: Publicar instalador EXE
         uses: actions/upload-artifact@v4
         with:
-          name: Converte-MP3-Sem-Limite-Evaldo-Setup-Windows10-11-x64
-          path: Converte-MP3-Sem-Limite-Evaldo-Setup-Windows10-11-x64.exe
+          name: FluxMidia-Setup-Windows10-11-x64
+          path: FluxMidia-Setup-Windows10-11-x64.exe
           if-no-files-found: error
           retention-days: 30
 
