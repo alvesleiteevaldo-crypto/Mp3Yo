@@ -6,6 +6,8 @@ on:
       - "main_batch.py"
       - "main_disc.py"
       - "main_queue100.py"
+      - "desktop_shortcut.py"
+      - "app_icon.ico"
       - "disc_tools.py"
       - "preparar_windows.py"
       - ".github/workflows/windows-exe.yml"
@@ -26,7 +28,7 @@ jobs:
       - name: Prepare FFmpeg
         run: python preparar_windows.py
       - name: Build single-file Windows executable
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name ConverteMP3SemLimiteEvaldo --add-binary "bin/ffmpeg.exe;bin" main_disc.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name ConverteMP3SemLimiteEvaldo --icon app_icon.ico --add-binary "bin/ffmpeg.exe;bin" main_disc.py
       - name: Validate executable
         shell: pwsh
         run: |
