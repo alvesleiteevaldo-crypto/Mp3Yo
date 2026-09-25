@@ -93,11 +93,11 @@ def is_playlist_url(url):
     return host.endswith("youtube.com") and bool(parse_qs(parsed.query).get("list"))
 
 
-def expand_playlist(url):
+def expand_playlist(url, auth=None):
     """Lista vídeos sem baixar; a fila baixa e converte cada faixa em sequência."""
     with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": "in_playlist",
                            "skip_download": True, "noplaylist": False,
-                           "ignoreerrors": True}) as probe:
+                           "ignoreerrors": True, **(auth or {})}) as probe:
         info = probe.extract_info(url, download=False)
     if not info or not info.get("entries"):
         raise RuntimeError("Não foi possível listar os vídeos da playlist.")
@@ -114,6 +114,26 @@ def expand_playlist(url):
     if not videos:
         raise RuntimeError("A playlist não contém vídeos disponíveis.")
     return videos
+
+
+def authentication_options(browser, cookie_file):
+    """Use only credentials explicitly selected by the user on this computer."""
+    if browser == "Sem login":
+        return {}
+    if browser in ("Chrome", "Edge", "Firefox"):
+        return {"cookiesfrombrowser": (browser.lower(),)}
+    if browser == "Arquivo cookies.txt":
+        path = Path(cookie_file).expanduser()
+        if not path.is_file() or path.suffix.lower() != ".txt":
+            raise ValueError("Selecione um arquivo cookies.txt válido.")
+        return {"cookiefile": str(path)}
+    raise ValueError("Selecione uma opção de acesso válida.")
+
+
+def needs_authentication(error):
+    message = str(error).casefold()
+    return ("sign in to confirm" in message and "not a bot" in message) or (
+        "faça login" in message and "robô" in message)
 
 
 def link_key(url):
@@ -150,8 +170,8 @@ def unique_links(urls):
     return result
 
 
-def options_for(folder, audio_format, progress_hook, mp3_quality="192"):
-    return {
+def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=None):
+    options = {
         "format": "bestaudio/best",
         "noplaylist": True,
         "outtmpl": str(Path(folder) / "%(title).180B [%(id)s].%(ext)s"),
@@ -164,7 +184,10 @@ def options_for(folder, audio_format, progress_hook, mp3_quality="192"):
         "progress_hooks": [progress_hook],
         "quiet": True,
         "no_warnings": True,
+        "sleep_interval_requests": 1,
     }
+    options.update(auth or {})
+    return options
 
 
 class App:
@@ -215,6 +238,17 @@ class App:
         ttk.Combobox(row, textvariable=self.mp3_quality, values=MP3_QUALITIES,
                      state="readonly", width=8).pack(side="left", padx=10)
         label("192/256/320 kbps para MP3; outros formatos usam o melhor áudio disponível.")
+        label("Acesso ao YouTube (se pedir confirmação de que você não é um robô):")
+        auth_row = tk.Frame(frame, bg="#333333")
+        auth_row.pack(fill="x", pady=(4, 8))
+        self.browser = tk.StringVar(value="Sem login")
+        ttk.Combobox(auth_row, textvariable=self.browser,
+                     values=("Sem login", "Chrome", "Edge", "Firefox", "Arquivo cookies.txt"),
+                     state="readonly", width=21).pack(side="left")
+        self.cookie_file = tk.StringVar()
+        tk.Entry(auth_row, textvariable=self.cookie_file).pack(side="left", fill="x", expand=True, padx=6)
+        tk.Button(auth_row, text="Escolher cookies.txt", command=self.select_cookies).pack(side="left")
+        label("Entre no YouTube pelo navegador escolhido antes de iniciar; o arquivo de cookies é opcional.")
         label("Pasta de destino:")
         folder_row = tk.Frame(frame, bg="#333333")
         folder_row.pack(fill="x", pady=(5, 12))
@@ -280,6 +314,12 @@ class App:
         if folder:
             self.folder.set(folder)
 
+    def select_cookies(self):
+        file = filedialog.askopenfilename(filetypes=[("Cookies do navegador", "*.txt")])
+        if file:
+            self.cookie_file.set(file)
+            self.browser.set("Arquivo cookies.txt")
+
     def report(self, line):
         self.log.config(state="normal")
         self.log.insert("end", line + "\n")
@@ -311,9 +351,10 @@ class App:
             return
         try:
             binary = ffmpeg_location()
+            auth = authentication_options(self.browser.get(), self.cookie_file.get())
             CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             CONFIG.write_text(json.dumps({"destination_folder": folder}), encoding="utf-8")
-        except (OSError, FileNotFoundError) as exc:
+        except (OSError, ValueError) as exc:
             messagebox.showerror("Preparação", str(exc))
             return
         self.running = True
@@ -323,17 +364,18 @@ class App:
         self.report(f"Lendo {len(urls)} link(s) em {self.audio_format.get().upper()}.")
         threading.Thread(target=self.worker,
                          args=(urls, folder, self.audio_format.get(), binary,
-                               self.mp3_quality.get()), daemon=True).start()
+                               self.mp3_quality.get(), auth), daemon=True).start()
 
-    def worker(self, urls, folder, audio_format, binary, mp3_quality="192"):
+    def worker(self, urls, folder, audio_format, binary, mp3_quality="192", auth=None):
         successes = 0
         failures = 0
         skipped = 0
+        paused = False
         expanded = []
         for url in urls:
             if is_playlist_url(url):
                 try:
-                    entries = expand_playlist(url)
+                    entries = expand_playlist(url, auth)
                     expanded.extend(entries)
                     self.root.after(0, lambda count=len(entries): self.report(
                         f"Playlist: {count} vídeo(s) encontrado(s)."))
@@ -341,9 +383,16 @@ class App:
                     failures += 1
                     self.root.after(0, lambda error=str(exc): self.report(
                         f"Não foi possível ler playlist: {error}"))
+                    if needs_authentication(exc):
+                        paused = True
+                        break
             else:
                 expanded.append(url)
         urls = unique_links(expanded)
+        if paused:
+            urls = []
+            self.root.after(0, lambda: self.report(
+                "Playlist exige confirmação do YouTube. Escolha um navegador com sessão ativa ou cookies.txt e tente novamente."))
         self.root.after(0, lambda items=urls: [self.table.insert(
             "", "end", iid=str(i), values=(url, "0%", "Aguardando"))
             for i, url in enumerate(items)])
@@ -378,7 +427,8 @@ class App:
                 if not video_id:
                     # Links curtos do TikTok precisam ser resolvidos para obter o ID.
                     with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True,
-                                           "noplaylist": True, "skip_download": True}) as probe:
+                                           "noplaylist": True, "skip_download": True,
+                                           **(auth or {})}) as probe:
                         info = probe.extract_info(url, download=False)
                     video_id = info.get("id") if info else None
                 found = existing_audio(folder, video_id, audio_format)
@@ -389,7 +439,7 @@ class App:
                         self.table.set(str(n-1), "status", "Já existe"),
                         self.report(f"{n}/{len(urls)}: {name} já está na pasta; extração ignorada.")))
                     continue
-                opts = options_for(folder, audio_format, hook, mp3_quality)
+                opts = options_for(folder, audio_format, hook, mp3_quality, auth)
                 opts["ffmpeg_location"] = binary
                 with yt_dlp.YoutubeDL(opts) as downloader:
                     result = downloader.download([url])
@@ -403,17 +453,25 @@ class App:
             except Exception as exc:
                 failures += 1
                 error = str(exc)
-                self.root.after(0, lambda n=index, e=error: (
+                blocked = needs_authentication(error)
+                self.root.after(0, lambda n=index, e=error, b=blocked: (
                     self.table.set(str(n-1), "progress", "—"),
-                    self.table.set(str(n-1), "status", "Erro"),
+                    self.table.set(str(n-1), "status", "Acesso" if b else "Erro"),
                     self.report(f"{n}/{len(urls)}: erro: {e}")))
+                if blocked:
+                    paused = True
+                    self.root.after(0, lambda: self.report(
+                        "YouTube solicitou confirmação. Fila interrompida; escolha Chrome, Edge, Firefox "
+                        "ou cookies.txt, faça login no YouTube e clique novamente em Converter."))
+                    break
             # O próximo item inicia assim que yt-dlp e a conversão terminam.
-        self.root.after(0, lambda: self.finish(successes, failures, skipped))
+        self.root.after(0, lambda: self.finish(successes, failures, skipped, paused))
 
-    def finish(self, successes, failures, skipped=0):
+    def finish(self, successes, failures, skipped=0, paused=False):
         self.running = False
         self.start_button.config(state="normal")
-        self.status.set(f"Fila concluída: {successes} sucesso(s), {skipped} já existente(s), {failures} falha(s).")
+        state = "Fila interrompida por confirmação do YouTube" if paused else "Fila concluída"
+        self.status.set(f"{state}: {successes} sucesso(s), {skipped} já existente(s), {failures} falha(s).")
         self.report(self.status.get())
         self.root.deiconify()
         self.root.lift()
