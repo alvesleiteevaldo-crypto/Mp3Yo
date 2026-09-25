@@ -1,12 +1,12 @@
 [Setup]
 AppId={{7F0E2AA4-9D6B-4A7D-AF26-2E4A1F0E6B90}
-AppName=Converte MP3 Sem Limite Evaldo
-AppVersion=1.1.0
+AppName=FluxMídia
+AppVersion=1.2.0
 AppPublisher=Evaldo
-DefaultDirName={autopf}\Converte MP3 Sem Limite Evaldo
-DefaultGroupName=Converte MP3 Sem Limite Evaldo
+DefaultDirName={autopf}\FluxMidia
+DefaultGroupName=FluxMidia
 OutputDir=.
-OutputBaseFilename=Converte-MP3-Sem-Limite-Evaldo-Setup-Windows10-11-x64
+OutputBaseFilename=FluxMidia-Setup-Windows10-11-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -22,8 +22,8 @@ Source: "package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs creat
 Source: "app_icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\Converte MP3 Sem Limite Evaldo"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
-Name: "{autodesktop}\Converte MP3 Sem Limite Evaldo"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
+Name: "{autoprograms}\FluxMídia"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
+Name: "{autodesktop}\FluxMídia"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
 
 [Run]
-Filename: "{app}\RedesSociaisDownloader.exe"; Description: "Abrir Converte MP3 Sem Limite Evaldo"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\RedesSociaisDownloader.exe"; Description: "Abrir FluxMídia"; Flags: nowait postinstall skipifsilent
