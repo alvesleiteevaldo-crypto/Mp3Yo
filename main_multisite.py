@@ -349,6 +349,194 @@ class App:
         self.log.pack(fill="both")
         self.root.after(800, self.poll_clipboard)
 
+    def open_disc_window(self):
+        if optical_drives is None:
+            messagebox.showerror("CD/DVD", "O módulo de CD/DVD não foi carregado.")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("FluxMídia — Converte CD/DVD")
+        win.geometry("860x680")
+        win.configure(bg="#1f2630")
+        win.transient(self.root)
+
+        header = tk.Frame(win, bg="#1f2630", padx=18, pady=14)
+        header.pack(fill="x")
+        tk.Label(header, text="💿", bg="#1f2630", fg="white",
+                 font=("Segoe UI Emoji", 28)).pack(side="left", padx=(0, 10))
+        head_text = tk.Frame(header, bg="#1f2630")
+        head_text.pack(side="left", fill="x", expand=True)
+        tk.Label(head_text, text="Converte CD/DVD", bg="#1f2630", fg="#45f28b",
+                 font=("Segoe UI", 18, "bold"), anchor="w").pack(fill="x")
+        tk.Label(head_text, text="Ferramentas de disco inspiradas nas funções do K3b, adaptadas para Windows",
+                 bg="#1f2630", fg="#c9d6e2", font=("Segoe UI", 10), anchor="w").pack(fill="x")
+
+        body = tk.Frame(win, bg="#1f2630", padx=18, pady=8)
+        body.pack(fill="both", expand=True)
+
+        drive_var = tk.StringVar()
+        format_var = tk.StringVar(value="mp3")
+        status_var = tk.StringVar(value="Insira um CD/DVD e clique em Atualizar unidades.")
+        entries = []
+
+        top = tk.LabelFrame(body, text="Unidade óptica", bg="#1f2630", fg="white",
+                            padx=10, pady=10)
+        top.pack(fill="x", pady=(0, 10))
+        tk.Label(top, text="Unidade:", bg="#1f2630", fg="white").pack(side="left")
+        drive_box = ttk.Combobox(top, textvariable=drive_var, state="readonly", width=12)
+        drive_box.pack(side="left", padx=7)
+
+        def refresh():
+            drives = optical_drives()
+            drive_box["values"] = drives
+            drive_var.set(drives[0] if drives else "")
+            status_var.set("Unidades atualizadas." if drives else "Nenhuma unidade de CD/DVD encontrada.")
+
+        tk.Button(top, text="Atualizar unidades", command=refresh).pack(side="left", padx=4)
+        tk.Button(top, text="Ejetar", command=lambda: self.eject_drive(drive_var.get(), status_var)).pack(side="left", padx=4)
+
+        actions = tk.LabelFrame(body, text="Operações", bg="#1f2630", fg="white",
+                                padx=10, pady=10)
+        actions.pack(fill="x", pady=(0, 10))
+
+        tk.Label(actions, text="Formato de saída:", bg="#1f2630", fg="white").grid(row=0, column=0, sticky="w")
+        ttk.Combobox(actions, textvariable=format_var,
+                     values=("mp3", "wav", "flac", "mp4", "avi"),
+                     state="readonly", width=10).grid(row=0, column=1, padx=8, sticky="w")
+
+        list_frame = tk.Frame(body, bg="#1f2630")
+        list_frame.pack(fill="both", expand=True, pady=(0, 10))
+        items = tk.Listbox(list_frame, selectmode="extended", bg="#10161d", fg="white",
+                           selectbackground="#1769ff", height=12)
+        items.pack(side="left", fill="both", expand=True)
+        sb = ttk.Scrollbar(list_frame, command=items.yview)
+        sb.pack(side="right", fill="y")
+        items.configure(yscrollcommand=sb.set)
+
+        def scan():
+            nonlocal entries
+            items.delete(0, "end")
+            entries = []
+            drive = drive_var.get()
+            if not drive:
+                messagebox.showwarning("CD/DVD", "Selecione uma unidade óptica.", parent=win)
+                return
+            try:
+                files = media_files(drive)
+                if files:
+                    entries = [("file", p) for p in files[:1000]]
+                    for p in files[:1000]:
+                        items.insert("end", f"Arquivo: {p.name}")
+                    status_var.set(f"{len(entries)} arquivo(s) de mídia encontrado(s).")
+                    return
+                tracks = audio_cd_tracks(drive)
+                entries = [("track", t) for t in tracks]
+                for number, start, end in tracks:
+                    items.insert("end", f"Faixa de áudio {number:02d} — {(end-start)//75}s")
+                status_var.set(f"{len(entries)} faixa(s) de CD de áudio encontrada(s).")
+            except Exception as exc:
+                messagebox.showerror("CD/DVD", str(exc), parent=win)
+
+        def copy_selected():
+            selection = [entries[i] for i in items.curselection()] if entries else []
+            if not selection:
+                messagebox.showwarning("CD/DVD", "Selecione pelo menos um item.", parent=win)
+                return
+            folder = self.folder.get().strip()
+            if not Path(folder).is_dir():
+                messagebox.showwarning("Destino", "Escolha uma pasta de destino válida na tela principal.", parent=win)
+                return
+            fmt = format_var.get()
+
+            def work():
+                ok = 0
+                try:
+                    ffmpeg = ffmpeg_location()
+                    for kind, source in selection:
+                        try:
+                            if kind == "track":
+                                if fmt != "mp3":
+                                    raise ValueError("Nesta versão, CD de áudio é extraído em MP3.")
+                                result = rip_and_convert(drive_var.get(), [source], folder, ffmpeg,
+                                                         lambda number, status: None)
+                                if not result or result[0][1] != "concluído":
+                                    raise RuntimeError(result[0][1] if result else "Falha ao extrair faixa.")
+                            else:
+                                dest = Path(folder) / f"Disco {drive_var.get()[0]} - {source.stem}.{fmt}"
+                                convert_file(source, dest, fmt, ffmpeg)
+                            ok += 1
+                        except Exception as exc:
+                            self.root.after(0, lambda e=str(exc): self.report("CD/DVD: " + e))
+                    self.root.after(0, lambda: status_var.set(f"Concluído: {ok}/{len(selection)} item(ns)."))
+                except Exception as exc:
+                    self.root.after(0, lambda: status_var.set("Erro: " + str(exc)))
+
+            threading.Thread(target=work, daemon=True).start()
+
+        button_bar = tk.Frame(actions, bg="#1f2630")
+        button_bar.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(10, 0))
+        tk.Button(button_bar, text="Ler disco", command=scan, bg="#0d5d7a", fg="white",
+                  padx=14).pack(side="left", padx=(0, 6))
+        tk.Button(button_bar, text="Extrair / converter selecionados", command=copy_selected,
+                  bg="#087a37", fg="white", padx=14).pack(side="left", padx=6)
+        tk.Button(button_bar, text="Copiar arquivos do disco para pasta",
+                  command=lambda: self.copy_disc_files(drive_var.get(), status_var),
+                  padx=14).pack(side="left", padx=6)
+
+        advanced = tk.LabelFrame(body, text="Funções do K3b adaptadas", bg="#1f2630", fg="white",
+                                 padx=10, pady=10)
+        advanced.pack(fill="x")
+        tk.Label(advanced,
+                 text="Disponível agora: leitura de CD/DVD, extração de CD de áudio, cópia e conversão de mídia.\n"
+                      "Gravação de ISO/CD/DVD e apagar mídia RW exigem um motor de gravação nativo do Windows e serão adicionados separadamente.",
+                 bg="#1f2630", fg="#c9d6e2", justify="left", anchor="w").pack(fill="x")
+
+        tk.Label(body, textvariable=status_var, bg="#1f2630", fg="#45f28b",
+                 anchor="w").pack(fill="x", pady=(10, 0))
+        refresh()
+
+    def copy_disc_files(self, drive, status_var):
+        if not drive:
+            status_var.set("Selecione uma unidade.")
+            return
+        folder = filedialog.askdirectory(title="Escolha onde copiar os arquivos do CD/DVD")
+        if not folder:
+            return
+
+        def work():
+            try:
+                root = Path(drive)
+                target = Path(folder) / ("Disco_" + drive[0])
+                target.mkdir(parents=True, exist_ok=True)
+                count = 0
+                for path in root.rglob("*"):
+                    if path.is_file():
+                        rel = path.relative_to(root)
+                        dest = target / rel
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(path, dest)
+                        count += 1
+                self.root.after(0, lambda: status_var.set(f"{count} arquivo(s) copiado(s) para {target}."))
+            except Exception as exc:
+                self.root.after(0, lambda: status_var.set("Erro ao copiar disco: " + str(exc)))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def eject_drive(self, drive, status_var):
+        if not drive:
+            status_var.set("Selecione uma unidade.")
+            return
+        try:
+            import ctypes
+            mci = ctypes.windll.winmm.mciSendStringW
+            alias = "fluxmidia_cd"
+            mci(f'open {drive[0]}: type cdaudio alias {alias}', None, 0, None)
+            mci(f'set {alias} door open', None, 0, None)
+            mci(f'close {alias}', None, 0, None)
+            status_var.set("Bandeja ejetada.")
+        except Exception as exc:
+            status_var.set("Não foi possível ejetar: " + str(exc))
+
     def minimize(self):
         if self.running:
             self.report("Janela minimizada; a fila continua em segundo plano.")
