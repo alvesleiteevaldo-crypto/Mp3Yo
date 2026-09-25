@@ -13,17 +13,17 @@ WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 SetupIconFile=app_icon.ico
-UninstallDisplayIcon={app}\RedesSociaisDownloader.exe
+UninstallDisplayIcon={app}\app_icon.ico
 PrivilegesRequired=admin
 DisableProgramGroupPage=yes
 
 [Files]
 Source: "package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "app_icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\Converte MP3 Sem Limite Evaldo"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\Converte MP3 Sem Limite Evaldo"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; Tasks: desktopicon
-
+Name: "{autoprograms}\Converte MP3 Sem Limite Evaldo"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
+Name: "{autodesktop}\Converte MP3 Sem Limite Evaldo"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
 
 [Run]
 Filename: "{app}\RedesSociaisDownloader.exe"; Description: "Abrir Converte MP3 Sem Limite Evaldo"; Flags: nowait postinstall skipifsilent
