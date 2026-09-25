@@ -9,7 +9,8 @@ if not hasattr(sys.modules["yt_dlp"], "YoutubeDL"):
     sys.modules["yt_dlp"].YoutubeDL = None
 from unittest.mock import patch
 from main_multisite import (youtube_links, unique_links, known_video_id,
-                            existing_audio, valid_url, is_playlist_url, expand_playlist)
+                            existing_audio, valid_url, is_playlist_url, expand_playlist,
+                            authentication_options, needs_authentication, options_for)
 
 
 class LinkHandlingTests(unittest.TestCase):
@@ -54,6 +55,18 @@ class LinkHandlingTests(unittest.TestCase):
             self.assertEqual(expand_playlist(playlist), [
                 'https://www.youtube.com/watch?v=abcdefghijk',
                 'https://www.youtube.com/watch?v=lmnopqrstuv'])
+
+    def test_auth_options_and_block_detection(self):
+        self.assertEqual(authentication_options('Edge', ''), {'cookiesfrombrowser': ('edge',)})
+        with tempfile.TemporaryDirectory() as directory:
+            cookies = Path(directory) / 'cookies.txt'
+            cookies.write_text('# Netscape HTTP Cookie File\n')
+            auth = authentication_options('Arquivo cookies.txt', str(cookies))
+            self.assertEqual(auth, {'cookiefile': str(cookies)})
+            with patch('main_multisite.ffmpeg_location', return_value='ffmpeg'):
+                self.assertEqual(options_for(directory, 'mp3', lambda _: None, auth=auth)['cookiefile'], str(cookies))
+        self.assertTrue(needs_authentication("Sign in to confirm you’re not a bot. Use --cookies"))
+        self.assertFalse(needs_authentication('Video unavailable'))
 
 
 if __name__ == '__main__':
