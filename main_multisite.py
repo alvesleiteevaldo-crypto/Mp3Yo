@@ -136,6 +136,24 @@ def needs_authentication(error):
         "faça login" in message and "robô" in message)
 
 
+def cookie_diagnostics(auth):
+    """Confirma leitura da sessão sem mostrar nem salvar os valores dos cookies."""
+    if not auth:
+        return "Sem login selecionado; escolha o navegador em Acesso ao YouTube."
+    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, **auth}) as probe:
+        cookies = list(probe.cookiejar)
+    google = [cookie for cookie in cookies if cookie.domain.lstrip(".").endswith(
+        ("youtube.com", "google.com"))]
+    account = [cookie for cookie in google if cookie.name in (
+        "SID", "HSID", "SSID", "APISID", "SAPISID") or cookie.name.startswith(
+        "__Secure-1P") or cookie.name.startswith("__Secure-3P")]
+    if not account:
+        raise RuntimeError(
+            "Nenhum cookie de conta do Google/YouTube foi encontrado nessa opção. "
+            "Entre no YouTube no navegador escolhido ou selecione um cookies.txt atualizado.")
+    return f"Sessão encontrada: {len(account)} cookie(s) de conta; verificando acesso ao vídeo."
+
+
 def link_key(url):
     """Identifica o mesmo vídeo mesmo com domínio curto ou parâmetros extras."""
     parsed = urlparse(url.strip())
@@ -238,7 +256,7 @@ class App:
         ttk.Combobox(row, textvariable=self.mp3_quality, values=MP3_QUALITIES,
                      state="readonly", width=8).pack(side="left", padx=10)
         label("192/256/320 kbps para MP3; outros formatos usam o melhor áudio disponível.")
-        label("Acesso ao YouTube (se pedir confirmação de que você não é um robô):")
+        label("Acesso ao YouTube — selecione o navegador em que você fez login:")
         auth_row = tk.Frame(frame, bg="#333333")
         auth_row.pack(fill="x", pady=(4, 8))
         self.browser = tk.StringVar(value="Sem login")
@@ -248,6 +266,8 @@ class App:
         self.cookie_file = tk.StringVar()
         tk.Entry(auth_row, textvariable=self.cookie_file).pack(side="left", fill="x", expand=True, padx=6)
         tk.Button(auth_row, text="Escolher cookies.txt", command=self.select_cookies).pack(side="left")
+        tk.Button(frame, text="Testar acesso ao primeiro vídeo", command=self.test_access).pack(
+            fill="x", pady=(0, 7))
         label("Entre no YouTube pelo navegador escolhido antes de iniciar; o arquivo de cookies é opcional.")
         label("Pasta de destino:")
         folder_row = tk.Frame(frame, bg="#333333")
@@ -320,6 +340,47 @@ class App:
             self.cookie_file.set(file)
             self.browser.set("Arquivo cookies.txt")
 
+    def test_access(self):
+        if self.running:
+            return
+        urls = youtube_links(self.links.get("1.0", "end"))
+        if not urls:
+            messagebox.showwarning("Teste", "Cole um link de vídeo ou playlist antes do teste.")
+            return
+        try:
+            auth = authentication_options(self.browser.get(), self.cookie_file.get())
+        except ValueError as exc:
+            messagebox.showerror("Acesso", str(exc))
+            return
+        self.running = True
+        self.start_button.config(state="disabled")
+        self.status.set("Testando acesso, sem baixar músicas...")
+        threading.Thread(target=self.access_worker, args=(urls[0], auth), daemon=True).start()
+
+    def access_worker(self, url, auth):
+        try:
+            detail = cookie_diagnostics(auth)
+            self.root.after(0, lambda: self.report(detail))
+            if not auth:
+                raise RuntimeError(detail)
+            if is_playlist_url(url):
+                url = expand_playlist(url, auth)[0]
+            with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True,
+                                   "noplaylist": True, **auth}) as probe:
+                info = probe.extract_info(url, download=False)
+            if not info or not info.get("formats"):
+                raise RuntimeError("Acesso confirmado parcialmente, mas nenhum áudio foi oferecido.")
+            result = "Teste OK: sessão lida e formatos disponíveis para o primeiro vídeo."
+        except Exception as exc:
+            result = "Teste falhou: " + str(exc)
+        self.root.after(0, lambda: self.finish_access_test(result))
+
+    def finish_access_test(self, result):
+        self.running = False
+        self.start_button.config(state="normal")
+        self.status.set(result)
+        self.report(result)
+
     def report(self, line):
         self.log.config(state="normal")
         self.log.insert("end", line + "\n")
@@ -362,6 +423,7 @@ class App:
         self.progress.configure(value=0)
         self.table.delete(*self.table.get_children())
         self.report(f"Lendo {len(urls)} link(s) em {self.audio_format.get().upper()}.")
+        self.report("Acesso selecionado: " + self.browser.get())
         threading.Thread(target=self.worker,
                          args=(urls, folder, self.audio_format.get(), binary,
                                self.mp3_quality.get(), auth), daemon=True).start()
@@ -371,6 +433,13 @@ class App:
         failures = 0
         skipped = 0
         paused = False
+        try:
+            detail = cookie_diagnostics(auth)
+            self.root.after(0, lambda message=detail: self.report(message))
+        except Exception as exc:
+            self.root.after(0, lambda message=str(exc): self.report("Falha na sessão: " + message))
+            self.root.after(0, lambda: self.finish(0, 1, 0, True))
+            return
         expanded = []
         for url in urls:
             if is_playlist_url(url):
@@ -460,9 +529,12 @@ class App:
                     self.report(f"{n}/{len(urls)}: erro: {e}")))
                 if blocked:
                     paused = True
-                    self.root.after(0, lambda: self.report(
-                        "YouTube solicitou confirmação. Fila interrompida; escolha Chrome, Edge, Firefox "
-                        "ou cookies.txt, faça login no YouTube e clique novamente em Converter."))
+                    advice = ("A opção 'Sem login' está ativa. Escolha o navegador em que você entrou no YouTube "
+                              "e use 'Testar acesso ao primeiro vídeo'." if not auth else
+                              "A sessão foi lida, mas o YouTube recusou o vídeo. Abra esse vídeo no navegador "
+                              "e conclua a verificação solicitada. Se persistir, tente um cookies.txt recente "
+                              "e use 'Testar acesso ao primeiro vídeo'.")
+                    self.root.after(0, lambda message=advice: self.report(message))
                     break
             # O próximo item inicia assim que yt-dlp e a conversão terminam.
         self.root.after(0, lambda: self.finish(successes, failures, skipped, paused))
