@@ -5,6 +5,7 @@ on:
     paths:
       - "main_batch.py"
       - "main_disc.py"
+      - "main_queue100.py"
       - "disc_tools.py"
       - "preparar_windows.py"
       - ".github/workflows/windows-exe.yml"
@@ -25,16 +26,16 @@ jobs:
       - name: Prepare FFmpeg
         run: python preparar_windows.py
       - name: Build single-file Windows executable
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name AudioDownloaderFila --add-binary "bin/ffmpeg.exe;bin" main_disc.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name ConverteMP3SemLimiteEvaldo --add-binary "bin/ffmpeg.exe;bin" main_disc.py
       - name: Validate executable
         shell: pwsh
         run: |
-          if (-not (Test-Path "dist/AudioDownloaderFila.exe")) { throw "EXE missing" }
-          $bytes = [System.IO.File]::ReadAllBytes("dist/AudioDownloaderFila.exe")
+          if (-not (Test-Path "dist/ConverteMP3SemLimiteEvaldo.exe")) { throw "EXE missing" }
+          $bytes = [System.IO.File]::ReadAllBytes("dist/ConverteMP3SemLimiteEvaldo.exe")
           if ($bytes.Length -lt 10000000 -or $bytes[0] -ne 77 -or $bytes[1] -ne 90) { throw "Invalid Windows executable" }
           Write-Host "Windows EXE size: $($bytes.Length) bytes"
       - uses: actions/upload-artifact@v4
         with:
-          name: AudioDownloaderFila-Windows10
-          path: dist/AudioDownloaderFila.exe
+          name: ConverteMP3SemLimiteEvaldo-Windows10
+          path: dist/ConverteMP3SemLimiteEvaldo.exe
           if-no-files-found: error
