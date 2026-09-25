@@ -118,15 +118,19 @@ def rip_audio_track(drive, start, end, wave_path, on_progress=None):
 
 
 def convert_file(source, destination, output_format, ffmpeg):
-    if output_format not in {"mp3", "mp4", "avi"}:
+    if output_format not in {"mp3", "wav", "flac", "mp4", "avi"}:
         raise ValueError("Formato inválido.")
-    if output_format != "mp3" and source.suffix.lower() not in VIDEO_EXTENSIONS:
-        raise ValueError("MP4 e AVI requerem um arquivo de vídeo; para áudio escolha MP3.")
+    if output_format in {"mp4", "avi"} and source.suffix.lower() not in VIDEO_EXTENSIONS:
+        raise ValueError("MP4 e AVI requerem um arquivo de vídeo; para áudio escolha MP3, WAV ou FLAC.")
     if destination.exists():
         raise FileExistsError(f"Arquivo já existe: {destination.name}")
     args = [ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", str(source)]
     if output_format == "mp3":
         args += ["-vn", "-codec:a", "libmp3lame", "-b:a", "192k"]
+    elif output_format == "wav":
+        args += ["-vn", "-codec:a", "pcm_s16le"]
+    elif output_format == "flac":
+        args += ["-vn", "-codec:a", "flac"]
     elif output_format == "mp4":
         args += ["-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-crf", "20",
                  "-preset", "medium", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"]
