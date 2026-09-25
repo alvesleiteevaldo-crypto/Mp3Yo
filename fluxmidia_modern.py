@@ -43,6 +43,7 @@ class ModernApp(App):
     def __init__(self, root):
         self.root = root
         self.running = False
+        self.stop_requested = False
         self.last_clipboard = None
 
         root.title("FluxMídia — Conversor de áudio, vídeo e CD/DVD")
@@ -364,8 +365,14 @@ class ModernApp(App):
         ).pack(side="left", fill="x", expand=True, ipady=7)
         self._button(destrow, "📁 Selecionar", self.select_folder, bg="#173047").pack(side="left", padx=(8, 0))
 
-        self.start_button = self._button(dest, "▶  Converter links em sequência", self.start, bg=GREEN2)
-        self.start_button.pack(fill="x")
+        actionrow = tk.Frame(dest, bg=PANEL)
+        actionrow.pack(fill="x")
+        self.start_button = self._button(actionrow, "▶  Converter links em sequência", self.start, bg=GREEN2)
+        self.start_button.pack(side="left", fill="x", expand=True, padx=(0, 4))
+        self.stop_button = self._button(actionrow, "■  Parar conversão", self.stop_conversion, bg="#a1262f")
+        self.stop_button.pack(side="left", padx=4)
+        self.shutdown_button = self._button(actionrow, "⏻  Desligar", self.shutdown_app, bg="#5f1d7a")
+        self.shutdown_button.pack(side="left", padx=(4, 0))
 
         tk.Label(extras, text="⚙  Opções adicionais:", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 10, "bold")).pack(anchor="w")
