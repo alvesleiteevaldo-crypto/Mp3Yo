@@ -4,6 +4,7 @@ O aplicativo original permanece em main.py, sem modificações.
 """
 
 import json
+import html
 import os
 import re
 from pathlib import Path
@@ -56,9 +57,33 @@ def ffmpeg_location():
 
 
 def youtube_links(text):
-    candidates = re.findall(r"https?://[^\s<>\"']+", text)
-    return [url for candidate in candidates
-            if valid_url(url := candidate.rstrip(".,;)]}"))]
+    """Encontra links mesmo em texto de compartilhamento, Markdown ou HTML."""
+    text = html.unescape(text).replace("\u200b", "").replace("\ufeff", "")
+    candidates = re.findall(r"https?://[^\s<>\"']+", text, flags=re.I)
+    links = []
+    for candidate in candidates:
+        url = candidate.rstrip(".,;)]}!?，。")
+        if valid_url(url):
+            links.append(url)
+    return links
+
+
+def existing_audio(folder, video_id, audio_format):
+    """Confere arquivos finalizados pelo ID, sem depender do título mutável."""
+    if not video_id or not re.fullmatch(r"[\w-]+", str(video_id)):
+        return None
+    suffix = f" [{video_id}].{audio_format}".casefold()
+    for path in Path(folder).iterdir():
+        if path.name.casefold().endswith(suffix) and path.is_file() and path.stat().st_size > 0:
+            return path
+    return None
+
+
+def known_video_id(url):
+    key = link_key(url)
+    if key.startswith(("video:", "tiktok:")):
+        return key.split(":", 1)[1]
+    return None
 
 
 def link_key(url):
@@ -186,12 +211,15 @@ class App:
 
     def poll_clipboard(self):
         try:
-            copied = self.root.clipboard_get()
+            try:
+                copied = self.root.clipboard_get()
+            except tk.TclError:
+                copied = self.root.clipboard_get(type="HTML Format")
             if copied != self.last_clipboard:
                 self.last_clipboard = copied
                 if self.auto_clipboard.get():
-                    existing = [line.strip() for line in self.links.get("1.0", "end").splitlines()]
-                    keys = {link_key(url) for url in existing if valid_url(url)}
+                    existing = youtube_links(self.links.get("1.0", "end"))
+                    keys = {link_key(url) for url in existing}
                     new = []
                     for url in youtube_links(copied):
                         key = link_key(url)
@@ -229,16 +257,12 @@ class App:
     def start(self):
         if self.running:
             return
-        urls = [line.strip() for line in self.links.get("1.0", "end").splitlines() if line.strip()]
+        raw = self.links.get("1.0", "end")
+        urls = unique_links(youtube_links(raw))
         folder = self.folder.get().strip()
         if not urls:
-            messagebox.showwarning("Links", "Informe ao menos um link.")
+            messagebox.showwarning("Links", "Não encontrei links válidos do YouTube ou TikTok no texto.")
             return
-        bad = [str(i) for i, url in enumerate(urls, 1) if not valid_url(url)]
-        if bad:
-            messagebox.showwarning("Links", "Link inválido nas linhas: " + ", ".join(bad))
-            return
-        urls = unique_links(urls)
         if len(urls) > MAX_LINKS:
             messagebox.showwarning("Links", "Informe no máximo 100 vídeos distintos.")
             return
@@ -274,6 +298,7 @@ class App:
     def worker(self, urls, folder, audio_format, binary, mp3_quality="192"):
         successes = 0
         failures = 0
+        skipped = 0
         for index, url in enumerate(urls, 1):
             last_update = [0.0, -1]
             self.root.after(0, lambda n=index: (self.progress.configure(value=0),
@@ -300,6 +325,21 @@ class App:
                         self.status.set(f"{n}/{len(urls)}: convertendo para {audio_format.upper()}...")))
 
             try:
+                video_id = known_video_id(url)
+                if not video_id:
+                    # Links curtos do TikTok precisam ser resolvidos para obter o ID.
+                    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True,
+                                           "noplaylist": True, "skip_download": True}) as probe:
+                        info = probe.extract_info(url, download=False)
+                    video_id = info.get("id") if info else None
+                found = existing_audio(folder, video_id, audio_format)
+                if found:
+                    skipped += 1
+                    self.root.after(0, lambda n=index, name=found.name: (
+                        self.table.set(str(n-1), "progress", "100%"),
+                        self.table.set(str(n-1), "status", "Já existe"),
+                        self.report(f"{n}/{len(urls)}: {name} já está na pasta; extração ignorada.")))
+                    continue
                 opts = options_for(folder, audio_format, hook, mp3_quality)
                 opts["ffmpeg_location"] = binary
                 with yt_dlp.YoutubeDL(opts) as downloader:
@@ -319,12 +359,12 @@ class App:
                     self.table.set(str(n-1), "status", "Erro"),
                     self.report(f"{n}/{len(urls)}: erro: {e}")))
             # O próximo item inicia assim que yt-dlp e a conversão terminam.
-        self.root.after(0, lambda: self.finish(successes, failures))
+        self.root.after(0, lambda: self.finish(successes, failures, skipped))
 
-    def finish(self, successes, failures):
+    def finish(self, successes, failures, skipped=0):
         self.running = False
         self.start_button.config(state="normal")
-        self.status.set(f"Fila concluída: {successes} sucesso(s), {failures} falha(s).")
+        self.status.set(f"Fila concluída: {successes} sucesso(s), {skipped} já existente(s), {failures} falha(s).")
         self.report(self.status.get())
         self.root.deiconify()
         self.root.lift()
