@@ -1,4 +1,4 @@
-"""Interface para YouTube e TikTok; a extração anterior permanece intacta.
+"""Interface para YouTube, TikTok e Facebook; a extração anterior permanece intacta.
 
 O aplicativo original permanece em main.py, sem modificações.
 """
@@ -19,7 +19,7 @@ from urllib.parse import urlparse, parse_qs
 import yt_dlp
 
 
-FORMATS = ("mp3", "m4a", "opus", "flac", "wav")
+FORMATS = ("mp3", "m4a", "opus", "flac", "wav")\nOUTPUT_TYPES = ("Áudio", "Vídeo MP4")
 MP3_QUALITIES = ("192", "256", "320")
 MAX_LINKS = 100
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -41,7 +41,11 @@ def valid_url(value):
             (host in ("vm.tiktok.com", "vt.tiktok.com") and bool(parsed.path.strip("/")))
             or ("video" in parsed.path.split("/") and bool(parsed.path.rstrip("/").split("/")[-1]))
         )
-        return parsed.scheme in ("http", "https") and (youtube or tiktok)
+        facebook = host in (
+            "facebook.com", "www.facebook.com", "m.facebook.com", "mbasic.facebook.com",
+            "fb.watch", "www.fb.watch"
+        ) and bool(parsed.path.strip("/"))
+        return parsed.scheme in ("http", "https") and (youtube or tiktok or facebook)
     except ValueError:
         return False
 
@@ -167,6 +171,8 @@ def link_key(url):
             if len(parts) > video_index + 1:
                 return "tiktok:" + parts[video_index+1]
         return "tiktok-short:" + host + "/" + parsed.path.strip("/")
+    if host.endswith("facebook.com") or host in ("fb.watch", "www.fb.watch"):
+        return "facebook:" + host + "/" + parsed.path.strip("/") + ("?" + parsed.query if parsed.query else "")
     if host in ("youtu.be", "www.youtu.be"):
         video_id = parts[0]
     elif parts[0] == "watch":
@@ -188,22 +194,30 @@ def unique_links(urls):
     return result
 
 
-def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=None):
+def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=None, output_type="Áudio"):
     options = {
-        "format": "bestaudio/best",
         "noplaylist": True,
         "outtmpl": str(Path(folder) / "%(title).180B [%(id)s].%(ext)s"),
         "ffmpeg_location": ffmpeg_location(),
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": audio_format,
-            "preferredquality": mp3_quality if audio_format == "mp3" else "0",
-        }],
         "progress_hooks": [progress_hook],
         "quiet": True,
         "no_warnings": True,
         "sleep_interval_requests": 1,
     }
+    if output_type == "Vídeo MP4":
+        options.update({
+            "format": "bestvideo*+bestaudio/best",
+            "merge_output_format": "mp4",
+        })
+    else:
+        options.update({
+            "format": "bestaudio/best",
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": audio_format,
+                "preferredquality": mp3_quality if audio_format == "mp3" else "0",
+            }],
+        })
     options.update(auth or {})
     return options
 
@@ -212,7 +226,7 @@ class App:
     def __init__(self, root):
         self.root = root
         self.running = False
-        root.title("Converte MP3 Sem Limite Evaldo — YouTube e TikTok")
+        root.title("Converte MP3 Sem Limite Evaldo — YouTube, TikTok e Facebook")
         root.geometry("820x850")
         root.configure(bg="#333333")
         frame = tk.Frame(root, bg="#333333", padx=20, pady=15)
@@ -221,11 +235,11 @@ class App:
         def label(text):
             tk.Label(frame, text=text, bg="#333333", fg="white", anchor="w").pack(fill="x")
 
-        label("Links de vídeos ou playlists do YouTube e TikTok (até 100 links):")
+        label("Links de vídeos ou playlists do YouTube, TikTok e Facebook (até 100 links):")
         self.links = tk.Text(frame, height=10, wrap="none")
         self.links.pack(fill="both", expand=True, pady=(5, 12))
         self.auto_clipboard = tk.BooleanVar(value=True)
-        tk.Checkbutton(frame, text="Adicionar links copiados do YouTube ou TikTok (sem iniciar download)",
+        tk.Checkbutton(frame, text="Adicionar automaticamente links copiados do YouTube, TikTok ou Facebook",
                        variable=self.auto_clipboard, bg="#333333", fg="white",
                        selectcolor="#333333", activebackground="#333333",
                        activeforeground="white").pack(anchor="w", pady=(0, 8))
@@ -247,7 +261,11 @@ class App:
         self.table.configure(yscrollcommand=scrollbar.set)
         row = tk.Frame(frame, bg="#333333")
         row.pack(fill="x")
-        tk.Label(row, text="Formato de saída:", bg="#333333", fg="white").pack(side="left")
+        tk.Label(row, text="Tipo:", bg="#333333", fg="white").pack(side="left")
+        self.output_type = tk.StringVar(value="Áudio")
+        ttk.Combobox(row, textvariable=self.output_type, values=OUTPUT_TYPES,
+                     state="readonly", width=12).pack(side="left", padx=10)
+        tk.Label(row, text="Formato de áudio:", bg="#333333", fg="white").pack(side="left")
         self.audio_format = tk.StringVar(value="mp3")
         ttk.Combobox(row, textvariable=self.audio_format, values=FORMATS,
                      state="readonly", width=10).pack(side="left", padx=10)
@@ -394,7 +412,7 @@ class App:
         urls = unique_links(youtube_links(raw))
         folder = self.folder.get().strip()
         if not urls:
-            messagebox.showwarning("Links", "Não encontrei links válidos do YouTube ou TikTok no texto.")
+            messagebox.showwarning("Links", "Não encontrei links válidos do YouTube, TikTok ou Facebook no texto.")
             return
         if len(urls) > MAX_LINKS:
             messagebox.showwarning("Links", "Informe no máximo 100 vídeos distintos.")
@@ -422,13 +440,13 @@ class App:
         self.start_button.config(state="disabled")
         self.progress.configure(value=0)
         self.table.delete(*self.table.get_children())
-        self.report(f"Lendo {len(urls)} link(s) em {self.audio_format.get().upper()}.")
+        self.report(f"Lendo {len(urls)} link(s) em {self.output_type.get() if self.output_type.get() == 'Vídeo MP4' else self.audio_format.get().upper()}.")
         self.report("Acesso selecionado: " + self.browser.get())
         threading.Thread(target=self.worker,
                          args=(urls, folder, self.audio_format.get(), binary,
-                               self.mp3_quality.get(), auth), daemon=True).start()
+                               self.mp3_quality.get(), auth, self.output_type.get()), daemon=True).start()
 
-    def worker(self, urls, folder, audio_format, binary, mp3_quality="192", auth=None):
+    def worker(self, urls, folder, audio_format, binary, mp3_quality="192", auth=None, output_type="Áudio"):
         successes = 0
         failures = 0
         skipped = 0
@@ -489,7 +507,7 @@ class App:
                     self.root.after(0, lambda row=n-1: (
                         self.table.set(str(row), "progress", "99%"),
                         self.table.set(str(row), "status", "Convertendo"),
-                        self.status.set(f"{n}/{len(urls)}: convertendo para {audio_format.upper()}...")))
+                        self.status.set(f"{n}/{len(urls)}: finalizando {output_type if output_type == 'Vídeo MP4' else audio_format.upper()}...")))
 
             try:
                 video_id = known_video_id(url)
@@ -500,7 +518,7 @@ class App:
                                            **(auth or {})}) as probe:
                         info = probe.extract_info(url, download=False)
                     video_id = info.get("id") if info else None
-                found = existing_audio(folder, video_id, audio_format)
+                found = None if output_type == "Vídeo MP4" else existing_audio(folder, video_id, audio_format)
                 if found:
                     skipped += 1
                     self.root.after(0, lambda n=index, name=found.name: (
@@ -508,7 +526,7 @@ class App:
                         self.table.set(str(n-1), "status", "Já existe"),
                         self.report(f"{n}/{len(urls)}: {name} já está na pasta; extração ignorada.")))
                     continue
-                opts = options_for(folder, audio_format, hook, mp3_quality, auth)
+                opts = options_for(folder, audio_format, hook, mp3_quality, auth, output_type)
                 opts["ffmpeg_location"] = binary
                 with yt_dlp.YoutubeDL(opts) as downloader:
                     result = downloader.download([url])
