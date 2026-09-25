@@ -67,6 +67,67 @@ class ModernApp(App):
 
         self.root.after(800, self.poll_clipboard)
 
+    def select_platform(self, platform):
+        self.platform_mode = platform
+        labels = {
+            "YouTube": "▶  YouTube — cole links de vídeos ou playlists",
+            "TikTok": "♪  TikTok — cole um ou mais links públicos para baixar",
+            "Facebook": "f  Facebook — cole um ou mais links públicos para baixar",
+        }
+        if hasattr(self, "platform_label"):
+            self.platform_label.config(text=f"{labels.get(platform, platform)} (até {MAX_LINKS} links)")
+        if hasattr(self, "status"):
+            backend = "motor atual do YouTube" if platform == "YouTube" else "motor Social-Media-Downloader integrado"
+            self.status.set(f"{platform} selecionado — {backend}.")
+        if hasattr(self, "links"):
+            self.links.focus_set()
+
+    def _platform_from_url(self, url):
+        try:
+            host = (urlparse(url).hostname or "").lower()
+        except ValueError:
+            return None
+        if "tiktok.com" in host:
+            return "TikTok"
+        if "facebook.com" in host or host.endswith("fb.watch"):
+            return "Facebook"
+        if "youtube.com" in host or "youtu.be" in host:
+            return "YouTube"
+        return None
+
+    def poll_clipboard(self):
+        try:
+            try:
+                copied = self.root.clipboard_get()
+            except tk.TclError:
+                copied = self.root.clipboard_get(type="HTML Format")
+            if copied != self.last_clipboard:
+                self.last_clipboard = copied
+                if self.auto_clipboard.get():
+                    from main_multisite import youtube_links, link_key
+                    existing = youtube_links(self.links.get("1.0", "end"))
+                    keys = {link_key(url) for url in existing}
+                    new = []
+                    for url in youtube_links(copied):
+                        key = link_key(url)
+                        if key not in keys:
+                            keys.add(key)
+                            new.append(url)
+                    for url in new[:max(0, MAX_LINKS - len(existing))]:
+                        self.links.insert("end", url + "\n")
+                        existing.append(url)
+                    if new:
+                        platform = self._platform_from_url(new[0])
+                        if platform:
+                            self.select_platform(platform)
+                        self.status.set(
+                            f"{platform or 'Link'} detectado da área de transferência e enviado para a tela de baixar."
+                        )
+        except (tk.TclError, UnicodeError):
+            pass
+        finally:
+            self.root.after(800, self.poll_clipboard)
+
     def _style(self):
         style = ttk.Style(self.root)
         try:
