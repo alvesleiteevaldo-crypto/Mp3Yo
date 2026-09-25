@@ -247,6 +247,7 @@ class App:
     def __init__(self, root):
         self.root = root
         self.running = False
+        self.stop_requested = False
         root.title("FluxMídia — Conversor de áudio, vídeo e CD/DVD")
         root.geometry("820x850")
         root.configure(bg="#333333")
@@ -638,9 +639,29 @@ class App:
         self.log.see("end")
         self.log.config(state="disabled")
 
+    def stop_conversion(self):
+        if not self.running:
+            self.status.set("Nenhuma conversão em andamento.")
+            return
+        self.stop_requested = True
+        self.status.set("Parando a conversão com segurança...")
+        self.report("Parada solicitada pelo usuário. Finalizando a operação atual.")
+
+    def shutdown_app(self):
+        if self.running:
+            if not messagebox.askyesno(
+                "Desligar FluxMídia",
+                "Há uma conversão em andamento. Deseja parar a conversão e desligar o FluxMídia?",
+                parent=self.root,
+            ):
+                return
+            self.stop_requested = True
+        self.root.destroy()
+
     def start(self):
         if self.running:
             return
+        self.stop_requested = False
         raw = self.links.get("1.0", "end")
         urls = unique_links(youtube_links(raw))
         folder = self.folder.get().strip()
@@ -690,6 +711,7 @@ class App:
         failures = 0
         skipped = 0
         paused = False
+        stopped = False
         try:
             detail = cookie_diagnostics(auth)
             self.root.after(0, lambda message=detail: self.report(message))
@@ -724,12 +746,18 @@ class App:
             for i, url in enumerate(items)])
         self.root.after(0, lambda: self.report(f"Fila preparada: {len(urls)} música(s)."))
         for index, url in enumerate(urls, 1):
+            if self.stop_requested:
+                stopped = True
+                self.root.after(0, lambda: self.report("Conversão interrompida pelo usuário."))
+                break
             last_update = [0.0, -1]
             self.root.after(0, lambda n=index: (self.progress.configure(value=0),
                            self.table.set(str(n-1), "status", "Baixando"),
                            self.status.set(f"Processando {n}/{len(urls)}: {urls[n-1]}")))
 
             def hook(data, n=index):
+                if self.stop_requested:
+                    raise RuntimeError("Conversão interrompida pelo usuário.")
                 if data.get("status") == "downloading":
                     total = data.get("total_bytes") or data.get("total_bytes_estimate") or 0
                     percent = min(99, 100 * data.get("downloaded_bytes", 0) / total) if total else 0
@@ -778,6 +806,10 @@ class App:
                     self.table.set(str(n-1), "status", "Pronto"),
                     self.report(f"{n}/{len(urls)}: concluído.")))
             except Exception as exc:
+                if self.stop_requested:
+                    stopped = True
+                    self.root.after(0, lambda: self.report("Conversão interrompida pelo usuário."))
+                    break
                 failures += 1
                 error = str(exc)
                 blocked = needs_authentication(error)
@@ -795,12 +827,14 @@ class App:
                     self.root.after(0, lambda message=advice: self.report(message))
                     break
             # O próximo item inicia assim que yt-dlp e a conversão terminam.
-        self.root.after(0, lambda: self.finish(successes, failures, skipped, paused))
+        self.root.after(0, lambda: self.finish(successes, failures, skipped, paused, stopped))
 
-    def finish(self, successes, failures, skipped=0, paused=False):
+    def finish(self, successes, failures, skipped=0, paused=False, stopped=False):
         self.running = False
+        self.stop_requested = False
         self.start_button.config(state="normal")
-        state = "Fila interrompida por confirmação do YouTube" if paused else "Fila concluída"
+        state = ("Conversão interrompida pelo usuário" if stopped else
+                 "Fila interrompida por confirmação do YouTube" if paused else "Fila concluída")
         self.status.set(f"{state}: {successes} sucesso(s), {skipped} já existente(s), {failures} falha(s).")
         self.report(self.status.get())
         self.root.deiconify()
