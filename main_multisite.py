@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import sys
 import threading
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from urllib.parse import urlparse, parse_qs
@@ -165,7 +166,9 @@ class App:
         tk.Button(folder_row, text="Selecionar", command=self.select_folder).pack(side="left", padx=8)
         self.start_button = tk.Button(frame, text="Converter links em sequência", bg="#006600",
                                       fg="white", command=self.start)
-        self.start_button.pack(fill="x", pady=(0, 10))
+        self.start_button.pack(fill="x", pady=(0, 4))
+        tk.Button(frame, text="Minimizar e continuar em segundo plano",
+                  command=self.minimize).pack(fill="x", pady=(0, 10))
         self.progress = ttk.Progressbar(frame, maximum=100)
         self.progress.pack(fill="x")
         self.status = tk.StringVar(value="Aguardando...")
@@ -175,6 +178,11 @@ class App:
         self.log = tk.Text(frame, height=6, state="disabled", wrap="word")
         self.log.pack(fill="both")
         self.root.after(800, self.poll_clipboard)
+
+    def minimize(self):
+        if self.running:
+            self.report("Janela minimizada; a fila continua em segundo plano.")
+        self.root.iconify()
 
     def poll_clipboard(self):
         try:
@@ -267,6 +275,7 @@ class App:
         successes = 0
         failures = 0
         for index, url in enumerate(urls, 1):
+            last_update = [0.0, -1]
             self.root.after(0, lambda n=index: (self.progress.configure(value=0),
                            self.table.set(str(n-1), "status", "Baixando"),
                            self.status.set(f"Processando {n}/{len(urls)}: {urls[n-1]}")))
@@ -274,12 +283,19 @@ class App:
             def hook(data, n=index):
                 if data.get("status") == "downloading":
                     total = data.get("total_bytes") or data.get("total_bytes_estimate") or 0
-                    percent = min(100, 100 * data.get("downloaded_bytes", 0) / total) if total else 0
+                    percent = min(99, 100 * data.get("downloaded_bytes", 0) / total) if total else 0
+                    rounded = int(percent)
+                    now = time.monotonic()
+                    # O extrator envia muitos eventos por segundo; evitar fila de UI atrasada.
+                    if rounded == last_update[1] or now - last_update[0] < 0.25:
+                        return
+                    last_update[:] = [now, rounded]
                     self.root.after(0, lambda p=percent, row=n-1: (
                         self.progress.configure(value=p),
                         self.table.set(str(row), "progress", f"{p:.0f}%")))
                 elif data.get("status") == "finished":
                     self.root.after(0, lambda row=n-1: (
+                        self.table.set(str(row), "progress", "99%"),
                         self.table.set(str(row), "status", "Convertendo"),
                         self.status.set(f"{n}/{len(urls)}: convertendo para {audio_format.upper()}...")))
 
@@ -287,7 +303,9 @@ class App:
                 opts = options_for(folder, audio_format, hook, mp3_quality)
                 opts["ffmpeg_location"] = binary
                 with yt_dlp.YoutubeDL(opts) as downloader:
-                    downloader.download([url])
+                    result = downloader.download([url])
+                    if result:
+                        raise RuntimeError(f"O extrator retornou código {result}.")
                 successes += 1
                 self.root.after(0, lambda n=index: (
                     self.table.set(str(n-1), "progress", "100%"),
@@ -297,15 +315,21 @@ class App:
                 failures += 1
                 error = str(exc)
                 self.root.after(0, lambda n=index, e=error: (
+                    self.table.set(str(n-1), "progress", "—"),
                     self.table.set(str(n-1), "status", "Erro"),
                     self.report(f"{n}/{len(urls)}: erro: {e}")))
+            # O próximo item inicia assim que yt-dlp e a conversão terminam.
         self.root.after(0, lambda: self.finish(successes, failures))
 
     def finish(self, successes, failures):
         self.running = False
         self.start_button.config(state="normal")
         self.status.set(f"Fila concluída: {successes} sucesso(s), {failures} falha(s).")
-        messagebox.showinfo("Resultado", self.status.get())
+        self.report(self.status.get())
+        self.root.deiconify()
+        self.root.lift()
+        self.root.bell()
+        messagebox.showinfo("Conversão finalizada", self.status.get(), parent=self.root)
 
 
 if __name__ == "__main__":
