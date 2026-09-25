@@ -5,7 +5,7 @@ import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from main_queue100 import App, ffmpeg_location
+from main_multisite import App, ffmpeg_location
 from disc_tools import optical_drives, media_files, audio_cd_tracks, convert_file, rip_and_convert
 from desktop_shortcut import ensure_desktop_shortcut
 
@@ -13,7 +13,7 @@ from desktop_shortcut import ensure_desktop_shortcut
 class DiscApp(App):
     def __init__(self, root):
         super().__init__(root)
-        root.title("Converte MP3 Sem Limite Evaldo — YouTube e CD/DVD")
+        root.title("Converte MP3 Sem Limite Evaldo — YouTube, TikTok e CD/DVD")
         root.geometry("850x980")
         self.disc_running = False
         self.drive = tk.StringVar()
