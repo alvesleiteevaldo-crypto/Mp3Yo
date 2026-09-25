@@ -19,6 +19,11 @@ from urllib.parse import urlparse, parse_qs
 
 import yt_dlp
 
+try:
+    from disc_tools import optical_drives, media_files, audio_cd_tracks, convert_file, rip_and_convert
+except Exception:
+    optical_drives = media_files = audio_cd_tracks = convert_file = rip_and_convert = None
+
 
 FORMATS = ("mp3", "m4a", "opus", "flac", "wav")
 OUTPUT_TYPES = ("Áudio MP3", "Vídeo MP4", "Vídeo AVI", "Vídeo MKV", "Vídeo MOV", "Áudio avançado")
@@ -242,7 +247,7 @@ class App:
     def __init__(self, root):
         self.root = root
         self.running = False
-        root.title("Converte MP3 Sem Limite Evaldo — YouTube, TikTok e Facebook")
+        root.title("FluxMídia — Conversor de áudio, vídeo e CD/DVD")
         root.geometry("820x850")
         root.configure(bg="#333333")
         frame = tk.Frame(root, bg="#333333", padx=20, pady=15)
@@ -251,6 +256,13 @@ class App:
         def label(text):
             tk.Label(frame, text=text, bg="#333333", fg="white", anchor="w").pack(fill="x")
 
+        title = tk.Label(frame, text="FluxMídia", bg="#333333", fg="#45f28b",
+                         font=("Segoe UI", 20, "bold"), anchor="w")
+        title.pack(fill="x")
+        tk.Label(frame, text="Conversor de áudio e vídeo", bg="#333333", fg="white",
+                 font=("Segoe UI", 11), anchor="w").pack(fill="x")
+        tk.Label(frame, text="Converte CD/DVD", bg="#333333", fg="#9bd8ff",
+                 font=("Segoe UI", 10, "bold"), anchor="w").pack(fill="x", pady=(0, 8))
         label("Links de vídeos ou playlists do YouTube, TikTok e Facebook (até 1000 links):")
         self.links = tk.Text(frame, height=10, wrap="none")
         self.links.pack(fill="both", expand=True, pady=(5, 12))
@@ -320,6 +332,12 @@ class App:
         self.start_button = tk.Button(frame, text="Converter links em sequência", bg="#006600",
                                       fg="white", command=self.start)
         self.start_button.pack(fill="x", pady=(0, 4))
+        disc_row = tk.Frame(frame, bg="#333333")
+        disc_row.pack(fill="x", pady=(2, 8))
+        tk.Button(disc_row, text="💿  Converter CD/DVD", command=self.open_disc_window,
+                  bg="#0d5d7a", fg="white", activebackground="#117a9f",
+                  activeforeground="white", font=("Segoe UI", 10, "bold"),
+                  padx=14, pady=7).pack(fill="x")
         label("Ao minimizar a janela, o aplicativo continua automaticamente em segundo plano.")
         self.progress = ttk.Progressbar(frame, maximum=100)
         self.progress.pack(fill="x")
