@@ -43,3 +43,9 @@ identificar uma música; copie também o link de compartilhamento.
 Antes de baixar, a fila verifica se já existe um áudio finalizado com o mesmo
 ID de vídeo e formato na pasta escolhida. Nesse caso marca **Já existe** e
 passa ao próximo item sem baixar nem converter. Arquivos vazios não contam.
+
+Também aceita link de playlist do YouTube (inclusive link `watch` com
+parâmetro `list`). O aplicativo lista as músicas, mostra cada vídeo na fila e
+baixa/converte **uma faixa por vez**, avançando após cada conclusão. É possível
+misturar playlists e vídeos avulsos; vídeos repetidos são processados uma só
+vez. Faixas indisponíveis são ignoradas ou marcadas como erro e a fila segue.
