@@ -5,15 +5,15 @@ import threading
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from main_batch import App, ffmpeg_location
+from main_queue100 import App, ffmpeg_location
 from disc_tools import optical_drives, media_files, audio_cd_tracks, convert_file, rip_and_convert
 
 
 class DiscApp(App):
     def __init__(self, root):
         super().__init__(root)
-        root.title("Mp3Yo — YouTube e CD/DVD")
-        root.geometry("790x850")
+        root.title("Converte MP3 Sem Limite Evaldo — YouTube e CD/DVD")
+        root.geometry("850x980")
         self.disc_running = False
         self.drive = tk.StringVar()
         self.disc_format = tk.StringVar(value="mp3")
