@@ -107,7 +107,6 @@ $addLinkView = @'
                              Watermark="Cole aqui videos e playlists (maximo 100 links)"
                              AcceptsReturn="True"
                              TextWrapping="Wrap"
-                             VerticalScrollBarVisibility="Auto"
                              FontSize="14"/>
                     <TextBlock Grid.Row="2" Text="Pasta de destino" FontWeight="SemiBold" Foreground="#E2E8F0"/>
                     <Grid Grid.Row="4" ColumnDefinitions="*,Auto">
@@ -208,24 +207,6 @@ $mainVmText = Read-Utf8 $mainVm
 $mainVmText = $mainVmText.Replace('Title = "Downloader Error", Message = "Failed to connect to Aria2"',
                                   'Title = "Erro do baixador", Message = "Nao foi possivel iniciar o Aria2"')
 Write-Utf8 $mainVm $mainVmText
-
-$settingsView = Join-Path $Root "YoutubeApp/Views/SettingsWindow.axaml"
-if (Test-Path $settingsView) {
-    $settingsText = Read-Utf8 $settingsView
-    $pairs = [ordered]@{
-        'Title="Settings"' = 'Title="Configuracoes"'
-        '>Save<' = '>Salvar<'
-        '>Cancel<' = '>Cancelar<'
-        'General' = 'Geral'
-        'Downloads' = 'Downloads'
-        'Filename' = 'Nome do arquivo'
-        'Quality' = 'Qualidade'
-    }
-    foreach ($pair in $pairs.GetEnumerator()) {
-        $settingsText = $settingsText.Replace($pair.Key, $pair.Value)
-    }
-    Write-Utf8 $settingsView $settingsText
-}
 
 $aboutView = Join-Path $Root "YoutubeApp/Views/AboutWindow.axaml"
 if (Test-Path $aboutView) {
