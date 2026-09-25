@@ -11,6 +11,7 @@ import subprocess
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from urllib.parse import urlparse
 
 from main_multisite import (
     App,
@@ -45,6 +46,7 @@ class ModernApp(App):
         self.running = False
         self.stop_requested = False
         self.last_clipboard = None
+        self.platform_mode = "YouTube"
 
         root.title("FluxMídia — Conversor de áudio, vídeo e CD/DVD")
         root.geometry("1120x850")
@@ -182,23 +184,32 @@ class ModernApp(App):
 
         nav = tk.Frame(head, bg=BG)
         nav.pack(side="right")
-        self._button(nav, "▶  YouTube", lambda: self.open_login("https://www.youtube.com/"), bg="#182638").pack(side="left", padx=3)
-        self._button(nav, "♪  TikTok", lambda: self.open_login("https://www.tiktok.com/login"), bg="#182638").pack(side="left", padx=3)
-        self._button(nav, "f  Facebook", lambda: self.open_login("https://www.facebook.com/"), bg="#182638").pack(side="left", padx=3)
+        self._button(nav, "▶  YouTube", lambda: self.select_platform("YouTube"), bg="#182638").pack(side="left", padx=3)
+        self._button(nav, "♪  TikTok", lambda: self.select_platform("TikTok"), bg="#182638").pack(side="left", padx=3)
+        self._button(nav, "f  Facebook", lambda: self.select_platform("Facebook"), bg="#182638").pack(side="left", padx=3)
         self._button(nav, "💿  Converte\nCD/DVD", self.open_disc_window, bg="#103e32").pack(side="left", padx=3)
 
     def _links_panel(self, parent):
         card = self._card(parent)
         card.pack(fill="x", pady=(0, 8))
 
+        self.platform_label = tk.Label(
+            card,
+            text=f"▶  YouTube — cole links de vídeos ou playlists (até {MAX_LINKS} links)",
+            bg=PANEL,
+            fg=CYAN,
+            font=("Segoe UI", 11, "bold"),
+            anchor="w",
+        )
+        self.platform_label.pack(fill="x")
         tk.Label(
             card,
-            text=f"🔗  Links de vídeos ou playlists do YouTube, TikTok e Facebook (até {MAX_LINKS} links):",
+            text="TikTok e Facebook usam o motor Social-Media-Downloader integrado; YouTube mantém o motor atual.",
             bg=PANEL,
-            fg=TEXT,
-            font=("Segoe UI", 10, "bold"),
+            fg=MUTED,
+            font=("Segoe UI", 8),
             anchor="w",
-        ).pack(fill="x")
+        ).pack(fill="x", pady=(2, 0))
 
         self.links = tk.Text(
             card,
