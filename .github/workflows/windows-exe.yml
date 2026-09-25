@@ -6,6 +6,7 @@ on:
       - "main_batch.py"
       - "main_disc.py"
       - "main_queue100.py"
+      - "main_multisite.py"
       - "desktop_shortcut.py"
       - "app_icon.ico"
       - "disc_tools.py"
