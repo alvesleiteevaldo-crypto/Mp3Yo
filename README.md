@@ -49,3 +49,15 @@ parâmetro `list`). O aplicativo lista as músicas, mostra cada vídeo na fila e
 baixa/converte **uma faixa por vez**, avançando após cada conclusão. É possível
 misturar playlists e vídeos avulsos; vídeos repetidos são processados uma só
 vez. Faixas indisponíveis são ignoradas ou marcadas como erro e a fila segue.
+
+Se aparecer **"Sign in to confirm you're not a bot"**, abra o YouTube no seu
+Chrome, Edge ou Firefox e entre na sua conta. No aplicativo, escolha esse
+navegador em **Acesso ao YouTube** e clique novamente em **Converter**. Também
+é possível escolher um arquivo `cookies.txt` do próprio navegador, em formato
+Netscape. O app usa essa opção apenas durante a execução; não salva os cookies
+na configuração nem no repositório. Quando o YouTube pedir confirmação, a fila
+para em vez de registrar o mesmo erro nas faixas restantes. Ao reiniciar, os
+arquivos já concluídos na pasta serão pulados. Se a sessão for recusada pelo
+YouTube, conclua a verificação exigida no navegador e tente novamente; o
+aplicativo não garante que cookies resolvam todo bloqueio ou exigência de PO
+Token. Nunca compartilhe seu `cookies.txt`, pois ele contém dados de sessão.
