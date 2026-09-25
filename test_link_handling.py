@@ -10,7 +10,8 @@ if not hasattr(sys.modules["yt_dlp"], "YoutubeDL"):
 from unittest.mock import patch
 from main_multisite import (youtube_links, unique_links, known_video_id,
                             existing_audio, valid_url, is_playlist_url, expand_playlist,
-                            authentication_options, needs_authentication, options_for)
+                            authentication_options, needs_authentication, options_for,
+                            cookie_diagnostics)
 
 
 class LinkHandlingTests(unittest.TestCase):
@@ -67,6 +68,18 @@ class LinkHandlingTests(unittest.TestCase):
                 self.assertEqual(options_for(directory, 'mp3', lambda _: None, auth=auth)['cookiefile'], str(cookies))
         self.assertTrue(needs_authentication("Sign in to confirm you’re not a bot. Use --cookies"))
         self.assertFalse(needs_authentication('Video unavailable'))
+
+    def test_session_diagnostic_requires_google_account_cookie(self):
+        class Probe:
+            def __init__(self, cookies): self.cookiejar = cookies
+            def __enter__(self): return self
+            def __exit__(self, *_): return None
+        cookie = types.SimpleNamespace(domain='.youtube.com', name='__Secure-3PSID')
+        with patch('main_multisite.yt_dlp.YoutubeDL', return_value=Probe([cookie])):
+            self.assertIn('Sessão encontrada', cookie_diagnostics({'cookiesfrombrowser': ('chrome',)}))
+        with patch('main_multisite.yt_dlp.YoutubeDL', return_value=Probe([])):
+            with self.assertRaisesRegex(RuntimeError, 'Nenhum cookie'):
+                cookie_diagnostics({'cookiesfrombrowser': ('chrome',)})
 
 
 if __name__ == '__main__':
