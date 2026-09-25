@@ -36,7 +36,7 @@ def platform_name(url):
     return "Social"
 
 
-def download_media(url, folder, output_type, mp3_quality, ffmpeg, progress_hook, stop_check=None):
+def download_media(url, folder, output_type, mp3_quality, ffmpeg, progress_hook, stop_check=None, video_quality="1080p"):
     """Baixa mídia pública TikTok/Facebook usando o fluxo do Social-Media-Downloader."""
 
     def hook(data):
@@ -66,8 +66,12 @@ def download_media(url, folder, output_type, mp3_quality, ffmpeg, progress_hook,
         })
     elif output_type.startswith("Vídeo "):
         target = output_type.split()[-1].lower()
+        try:
+            max_height = int(str(video_quality).lower().replace("p", ""))
+        except ValueError:
+            max_height = 1080
         options.update({
-            "format": "bestvideo*+bestaudio/best",
+            "format": f"bestvideo*[height<={max_height}]+bestaudio/best[height<={max_height}]/best",
             "merge_output_format": "mkv" if target in ("avi", "mov") else target,
         })
         if target in ("avi", "mov"):
