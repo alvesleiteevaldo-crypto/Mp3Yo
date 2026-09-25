@@ -7,6 +7,7 @@ from tkinter import messagebox, ttk
 
 from main_queue100 import App, ffmpeg_location
 from disc_tools import optical_drives, media_files, audio_cd_tracks, convert_file, rip_and_convert
+from desktop_shortcut import ensure_desktop_shortcut
 
 
 class DiscApp(App):
@@ -37,6 +38,16 @@ class DiscApp(App):
         self.disc_button = tk.Button(panel, text="Copiar itens selecionados", command=self.start_disc)
         self.disc_button.pack(pady=5)
         self.refresh_drives()
+        self.root.after(700, self.install_shortcut)
+
+    def install_shortcut(self):
+        def create():
+            try:
+                result = ensure_desktop_shortcut()
+                self.root.after(0, lambda: self.report(result))
+            except Exception as exc:
+                self.root.after(0, lambda error=str(exc): self.report(f"Atalho: {error}"))
+        threading.Thread(target=create, daemon=True).start()
 
     def refresh_drives(self):
         drives = optical_drives()
