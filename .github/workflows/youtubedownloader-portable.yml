@@ -80,15 +80,15 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pyinstaller yt-dlp pillow
           python "$PWD/tools/generate_fluxmidia_icon.py"
-          python -m py_compile "$PWD/main_multisite.py" "$PWD/disc_tools.py"
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name FluxMidia --icon "$PWD/app_icon.ico" --collect-all yt_dlp --add-binary "$PWD/package/utils/ffmpeg.exe;bin" "$PWD/main_multisite.py"
+          python -m py_compile "$PWD/main_multisite.py" "$PWD/disc_tools.py" "$PWD/fluxmidia_modern.py"
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name FluxMidia --icon "$PWD/app_icon.ico" --collect-all yt_dlp --add-binary "$PWD/package/utils/ffmpeg.exe;bin" "$PWD/fluxmidia_modern.py"
           Copy-Item "$PWD/dist/FluxMidia.exe" "$PWD/package/FluxMidia.exe" -Force
           Copy-Item "$PWD/dist/FluxMidia.exe" "$PWD/package/RedesSociaisDownloader.exe" -Force
 
           @"
           MODULO DE REDES SOCIAIS
           -----------------------
-          Abra FluxMidia.exe para YouTube, TikTok, Facebook e CD/DVD.
+          Abra FluxMidia.exe para YouTube, TikTok, Facebook e CD/DVD. A interface moderna usa o motor original de main_multisite.py e disc_tools.py.
           Ao copiar um link compativel, ele aparece automaticamente na lista.
           Escolha Audio ou Video MP4 antes de iniciar.
           A fila aceita ate 1000 links e ignora repetidos.
