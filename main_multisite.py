@@ -34,7 +34,8 @@ def valid_url(value):
         youtube = host in (
             "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
             "youtu.be", "www.youtu.be",
-        ) and bool(parsed.path.strip("/"))
+        ) and (bool(parsed.path.strip("/")) or (parsed.path == "/playlist" and
+               bool(parse_qs(parsed.query).get("list"))))
         tiktok = host in ("tiktok.com", "www.tiktok.com", "m.tiktok.com",
                           "vm.tiktok.com", "vt.tiktok.com") and (
             (host in ("vm.tiktok.com", "vt.tiktok.com") and bool(parsed.path.strip("/")))
@@ -86,11 +87,42 @@ def known_video_id(url):
     return None
 
 
+def is_playlist_url(url):
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    return host.endswith("youtube.com") and bool(parse_qs(parsed.query).get("list"))
+
+
+def expand_playlist(url):
+    """Lista vídeos sem baixar; a fila baixa e converte cada faixa em sequência."""
+    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "extract_flat": "in_playlist",
+                           "skip_download": True, "noplaylist": False,
+                           "ignoreerrors": True}) as probe:
+        info = probe.extract_info(url, download=False)
+    if not info or not info.get("entries"):
+        raise RuntimeError("Não foi possível listar os vídeos da playlist.")
+    videos = []
+    for entry in info["entries"]:
+        if not entry:
+            continue
+        video_id = entry.get("id")
+        video_url = entry.get("webpage_url") or entry.get("url") or ""
+        if valid_url(video_url) and not is_playlist_url(video_url):
+            videos.append(video_url)
+        elif video_id and re.fullmatch(r"[\w-]{11}", str(video_id)):
+            videos.append("https://www.youtube.com/watch?v=" + str(video_id))
+    if not videos:
+        raise RuntimeError("A playlist não contém vídeos disponíveis.")
+    return videos
+
+
 def link_key(url):
     """Identifica o mesmo vídeo mesmo com domínio curto ou parâmetros extras."""
     parsed = urlparse(url.strip())
     host = (parsed.hostname or "").lower()
     parts = parsed.path.strip("/").split("/")
+    if is_playlist_url(url):
+        return "playlist:" + parse_qs(parsed.query)["list"][0]
     if host.endswith("tiktok.com"):
         if "video" in parts:
             video_index = parts.index("video")
@@ -148,7 +180,7 @@ class App:
         def label(text):
             tk.Label(frame, text=text, bg="#333333", fg="white", anchor="w").pack(fill="x")
 
-        label("Links do YouTube ou TikTok (um por linha; até 100, sem repetição):")
+        label("Links de vídeos ou playlists do YouTube e TikTok (até 100 links):")
         self.links = tk.Text(frame, height=10, wrap="none")
         self.links.pack(fill="both", expand=True, pady=(5, 12))
         self.auto_clipboard = tk.BooleanVar(value=True)
@@ -288,9 +320,7 @@ class App:
         self.start_button.config(state="disabled")
         self.progress.configure(value=0)
         self.table.delete(*self.table.get_children())
-        for index, url in enumerate(urls):
-            self.table.insert("", "end", iid=str(index), values=(url, "0%", "Aguardando"))
-        self.report(f"Iniciando {len(urls)} link(s) em {self.audio_format.get().upper()}.")
+        self.report(f"Lendo {len(urls)} link(s) em {self.audio_format.get().upper()}.")
         threading.Thread(target=self.worker,
                          args=(urls, folder, self.audio_format.get(), binary,
                                self.mp3_quality.get()), daemon=True).start()
@@ -299,6 +329,25 @@ class App:
         successes = 0
         failures = 0
         skipped = 0
+        expanded = []
+        for url in urls:
+            if is_playlist_url(url):
+                try:
+                    entries = expand_playlist(url)
+                    expanded.extend(entries)
+                    self.root.after(0, lambda count=len(entries): self.report(
+                        f"Playlist: {count} vídeo(s) encontrado(s)."))
+                except Exception as exc:
+                    failures += 1
+                    self.root.after(0, lambda error=str(exc): self.report(
+                        f"Não foi possível ler playlist: {error}"))
+            else:
+                expanded.append(url)
+        urls = unique_links(expanded)
+        self.root.after(0, lambda items=urls: [self.table.insert(
+            "", "end", iid=str(i), values=(url, "0%", "Aguardando"))
+            for i, url in enumerate(items)])
+        self.root.after(0, lambda: self.report(f"Fila preparada: {len(urls)} música(s)."))
         for index, url in enumerate(urls, 1):
             last_update = [0.0, -1]
             self.root.after(0, lambda n=index: (self.progress.configure(value=0),
