@@ -25,11 +25,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: python -m pip install --upgrade pip yt-dlp imageio-ffmpeg pyinstaller
+        run: python -m pip install --upgrade pip "yt-dlp[default]" imageio-ffmpeg pyinstaller
       - name: Prepare FFmpeg
         run: python preparar_windows.py
       - name: Build single-file Windows executable
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name ConverteMP3SemLimiteEvaldo --icon app_icon.ico --add-binary "bin/ffmpeg.exe;bin" main_disc.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name ConverteMP3SemLimiteEvaldo --icon app_icon.ico --add-binary "bin/ffmpeg.exe;bin" --collect-all yt_dlp main_disc.py
       - name: Validate executable
         shell: pwsh
         run: |
