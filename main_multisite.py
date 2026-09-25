@@ -19,7 +19,8 @@ from urllib.parse import urlparse, parse_qs
 import yt_dlp
 
 
-FORMATS = ("mp3", "m4a", "opus", "flac", "wav")\nOUTPUT_TYPES = ("Áudio", "Vídeo MP4")
+FORMATS = ("mp3", "m4a", "opus", "flac", "wav")
+OUTPUT_TYPES = ("Áudio", "Vídeo MP4")
 MP3_QUALITIES = ("192", "256", "320")
 MAX_LINKS = 100
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
