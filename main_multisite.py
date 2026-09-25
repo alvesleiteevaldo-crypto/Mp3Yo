@@ -18,6 +18,7 @@ from tkinter import filedialog, messagebox, ttk
 from urllib.parse import urlparse, parse_qs
 
 import yt_dlp
+from social_media_backend import is_social_url, platform_name, download_media as social_download_media
 
 try:
     from disc_tools import optical_drives, media_files, audio_cd_tracks, convert_file, rip_and_convert
@@ -794,12 +795,20 @@ class App:
                         self.table.set(str(n-1), "status", "Já existe"),
                         self.report(f"{n}/{len(urls)}: {name} já está na pasta; extração ignorada.")))
                     continue
-                opts = options_for(folder, audio_format, hook, mp3_quality, auth, output_type)
-                opts["ffmpeg_location"] = binary
-                with yt_dlp.YoutubeDL(opts) as downloader:
-                    result = downloader.download([url])
-                    if result:
-                        raise RuntimeError(f"O extrator retornou código {result}.")
+                if is_social_url(url):
+                    self.root.after(0, lambda p=platform_name(url): self.report(
+                        f"{p}: usando motor Social-Media-Downloader integrado."))
+                    social_download_media(
+                        url, folder, output_type, mp3_quality, binary, hook,
+                        stop_check=lambda: self.stop_requested,
+                    )
+                else:
+                    opts = options_for(folder, audio_format, hook, mp3_quality, auth, output_type)
+                    opts["ffmpeg_location"] = binary
+                    with yt_dlp.YoutubeDL(opts) as downloader:
+                        result = downloader.download([url])
+                        if result:
+                            raise RuntimeError(f"O extrator retornou código {result}.")
                 successes += 1
                 self.root.after(0, lambda n=index: (
                     self.table.set(str(n-1), "progress", "100%"),
