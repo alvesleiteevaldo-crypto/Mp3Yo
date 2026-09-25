@@ -293,15 +293,12 @@ class App:
         self.output_type = tk.StringVar(value="Áudio MP3")
         ttk.Combobox(row, textvariable=self.output_type, values=OUTPUT_TYPES,
                      state="readonly", width=16).pack(side="left", padx=10)
-        tk.Label(row, text="Formato de áudio:", bg="#333333", fg="white").pack(side="left")
         self.audio_format = tk.StringVar(value="mp3")
-        ttk.Combobox(row, textvariable=self.audio_format, values=FORMATS,
-                     state="readonly", width=10).pack(side="left", padx=10)
         tk.Label(row, text="Qualidade MP3:", bg="#333333", fg="white").pack(side="left", padx=(15, 0))
         self.mp3_quality = tk.StringVar(value="192")
         ttk.Combobox(row, textvariable=self.mp3_quality, values=MP3_QUALITIES,
                      state="readonly", width=8).pack(side="left", padx=10)
-        label("Escolha Áudio MP3 ou Vídeo MP4. A opção Áudio avançado mantém M4A, OPUS, FLAC e WAV.")
+        label("Áudio MP3 usa MP3 automaticamente. Vídeos: MP4, AVI, MKV e MOV.")
         label("Acesso ao YouTube — selecione o navegador em que você fez login:")
         auth_row = tk.Frame(frame, bg="#333333")
         auth_row.pack(fill="x", pady=(4, 8))
