@@ -22,8 +22,8 @@ Source: "package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs creat
 Source: "app_icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\FluxMídia"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
-Name: "{autodesktop}\FluxMídia"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
+Name: "{autoprograms}\FluxMídia"; Filename: "{app}\FluxMidia.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
+Name: "{autodesktop}\FluxMídia"; Filename: "{app}\FluxMidia.exe"; WorkingDir: "{app}"; IconFilename: "{app}\app_icon.ico"
 
 [Run]
-Filename: "{app}\RedesSociaisDownloader.exe"; Description: "Abrir FluxMídia"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\FluxMidia.exe"; Description: "Abrir FluxMídia"; Flags: nowait postinstall skipifsilent
