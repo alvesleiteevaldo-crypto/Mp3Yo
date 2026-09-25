@@ -61,3 +61,13 @@ arquivos já concluídos na pasta serão pulados. Se a sessão for recusada pelo
 YouTube, conclua a verificação exigida no navegador e tente novamente; o
 aplicativo não garante que cookies resolvam todo bloqueio ou exigência de PO
 Token. Nunca compartilhe seu `cookies.txt`, pois ele contém dados de sessão.
+
+Na versão atual, selecione primeiro o navegador no qual o YouTube abre os
+vídeos normalmente e clique em **Testar acesso ao primeiro vídeo**. O teste
+confere se os cookies da conta foram lidos e se o primeiro vídeo oferece
+formatos, sem baixar a faixa. Se aparecer **Nenhum cookie de conta**, escolha
+o perfil/navegador correto ou um `cookies.txt` recente. Se houver cookies, mas
+o YouTube ainda pedir login, é uma recusa do serviço: conclua a verificação
+no próprio navegador e repita o teste. Cookies ou PO Tokens não garantem o
+acesso quando a conta ou a conexão continua bloqueada. O log mostra só a
+quantidade de cookies encontrados; não mostra seus valores.
