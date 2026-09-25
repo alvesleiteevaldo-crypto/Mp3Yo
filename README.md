@@ -34,3 +34,12 @@ não o inclui; o iniciador cria `bin/ffmpeg.exe` ao preparar o aplicativo.
 
 O download e a conversão dependem de acesso ao YouTube, do yt-dlp e de
 FFmpeg atualizados. Use somente conteúdo que você tem permissão para baixar.
+
+Na interface `main_disc.py` (que usa `main_multisite.py`), é possível colar
+texto compartilhado com capa/miniatura, descrição e links do YouTube ou TikTok:
+o aplicativo extrai as URLs válidas mesmo quando há HTML ou vários links na
+mesma linha. Imagens copiadas sem nenhum endereço de vídeo não permitem
+identificar uma música; copie também o link de compartilhamento.
+Antes de baixar, a fila verifica se já existe um áudio finalizado com o mesmo
+ID de vídeo e formato na pasta escolhida. Nesse caso marca **Já existe** e
+passa ao próximo item sem baixar nem converter. Arquivos vazios não contam.
