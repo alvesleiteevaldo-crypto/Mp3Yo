@@ -22,7 +22,7 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Preparar Python para modulo TikTok
+      - name: Preparar Python para modulo redes sociais
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -74,23 +74,28 @@ jobs:
           if (-not $ffmpeg) { throw "ffmpeg.exe nao encontrado" }
           Copy-Item $ffmpeg.FullName "$utils/ffmpeg.exe" -Force
 
-      - name: Gerar modulo TikTok portátil sem alterar o motor YouTube
+      - name: Gerar modulo redes sociais portátil sem alterar o motor YouTube
         shell: pwsh
         run: |
           py -m pip install --upgrade pip
           py -m pip install pyinstaller yt-dlp
-          py -m PyInstaller --noconfirm --clean --onefile --windowed --name TikTokDownloader --icon "$PWD/app_icon.ico" --collect-all yt_dlp --add-binary "$PWD/package/utils/ffmpeg.exe;bin" "$PWD/main_multisite.py"
-          Copy-Item "$PWD/dist/TikTokDownloader.exe" "$PWD/package/TikTokDownloader.exe" -Force
+          py -m py_compile "$PWD/main_multisite.py"
+          py -m PyInstaller --noconfirm --clean --onefile --windowed --name RedesSociaisDownloader --icon "$PWD/app_icon.ico" --collect-all yt_dlp --add-binary "$PWD/package/utils/ffmpeg.exe;bin" "$PWD/main_multisite.py"
+          Copy-Item "$PWD/dist/RedesSociaisDownloader.exe" "$PWD/package/RedesSociaisDownloader.exe" -Force
+          Copy-Item "$PWD/dist/RedesSociaisDownloader.exe" "$PWD/package/TikTokDownloader.exe" -Force
 
           @"
-          MODO TIKTOK
-          -----------
-          Abra TikTokDownloader.exe para colar links do TikTok.
+          MODULO DE REDES SOCIAIS
+          -----------------------
+          Abra RedesSociaisDownloader.exe para YouTube, TikTok e Facebook.
+          Ao copiar um link compativel, ele aparece automaticamente na lista.
+          Escolha Audio ou Video MP4 antes de iniciar.
           A fila aceita ate 100 links e ignora repetidos.
-          O motor do YouTube/playlist permanece separado e intacto.
+          TikTokDownloader.exe foi mantido por compatibilidade e abre o mesmo modulo.
+          O motor principal do YouTube/playlist permanece separado e intacto.
 
           Use apenas videos que voce tenha permissao para baixar.
-          "@ | Set-Content "$PWD/package/LEIA-ME-TIKTOK.txt" -Encoding UTF8
+          "@ | Set-Content "$PWD/package/LEIA-ME-REDES-SOCIAIS.txt" -Encoding UTF8
 
       - name: Incluir licença e informação do código-fonte
         shell: pwsh
@@ -101,7 +106,7 @@ jobs:
           https://github.com/legend2ks/YoutubeDownloader
           Commit base: be1e8705336ef7f38ef40d8bed9f66f4b46c185d
 
-          Customizações PT-BR, fila de até 100 links, modulo TikTok e empacotamento portátil:
+          Customizações PT-BR, fila de até 100 links, modulo YouTube/TikTok/Facebook e empacotamento portátil:
           https://github.com/alvesleiteevaldo-crypto/Mp3Yo/tree/integrar-youtubedownloader-portatil
 
           Use apenas conteúdo que você tenha autorização para baixar.
