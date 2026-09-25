@@ -24,8 +24,6 @@ Source: "package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs creat
 Name: "{autoprograms}\Converte MP3 Sem Limite Evaldo"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"
 Name: "{autodesktop}\Converte MP3 Sem Limite Evaldo"; Filename: "{app}\RedesSociaisDownloader.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
-[Tasks]
-Name: "desktopicon"; Description: "Criar atalho na Área de Trabalho"; GroupDescription: "Atalhos:"; Flags: unchecked
 
 [Run]
 Filename: "{app}\RedesSociaisDownloader.exe"; Description: "Abrir Converte MP3 Sem Limite Evaldo"; Flags: nowait postinstall skipifsilent
