@@ -35,7 +35,7 @@ jobs:
           git checkout be1e8705336ef7f38ef40d8bed9f66f4b46c185d
           git submodule update --init --recursive
 
-      - name: Aplicar interface PT-BR e limite de 100 links
+      - name: Aplicar interface PT-BR e fila ampliada
         shell: pwsh
         run: |
           ./integration/apply-customizations.ps1 -Root "$PWD/upstream"
@@ -90,7 +90,7 @@ jobs:
           Abra RedesSociaisDownloader.exe para YouTube, TikTok e Facebook.
           Ao copiar um link compativel, ele aparece automaticamente na lista.
           Escolha Audio ou Video MP4 antes de iniciar.
-          A fila aceita ate 100 links e ignora repetidos.
+          A fila aceita ate 1000 links e ignora repetidos.
           TikTokDownloader.exe foi mantido por compatibilidade e abre o mesmo modulo.
           O motor principal do YouTube/playlist permanece separado e intacto.
 
@@ -106,7 +106,7 @@ jobs:
           https://github.com/legend2ks/YoutubeDownloader
           Commit base: be1e8705336ef7f38ef40d8bed9f66f4b46c185d
 
-          Customizações PT-BR, fila de até 100 links, modulo YouTube/TikTok/Facebook e empacotamento portátil:
+          Customizações PT-BR, fila de até 1000 links, modulo YouTube/TikTok/Facebook e empacotamento portátil:
           https://github.com/alvesleiteevaldo-crypto/Mp3Yo/tree/integrar-youtubedownloader-portatil
 
           Use apenas conteúdo que você tenha autorização para baixar.
@@ -116,6 +116,28 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive -Path "$PWD/package/*" -DestinationPath "$PWD/Conversor-Video-Audio-PTBR-Windows10-11-x64.zip" -Force
+
+      - name: Gerar instalador EXE para Windows 10/11
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          Copy-Item "$PWD/app_icon.ico" "$PWD/installer/app_icon.ico" -Force
+          Copy-Item -Recurse "$PWD/package" "$PWD/installer/package" -Force
+          Push-Location "$PWD/installer"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "ConversorEvaldo.iss"
+          Pop-Location
+          $setup = Get-ChildItem "$PWD/installer" -Filter "Converte-MP3-Sem-Limite-Evaldo-Setup-Windows10-11-x64.exe" | Select-Object -First 1
+          if (-not $setup) { throw "Instalador EXE não foi gerado." }
+          Copy-Item $setup.FullName "$PWD/Converte-MP3-Sem-Limite-Evaldo-Setup-Windows10-11-x64.exe" -Force
+
+      - name: Publicar instalador EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Converte-MP3-Sem-Limite-Evaldo-Setup-Windows10-11-x64
+          path: Converte-MP3-Sem-Limite-Evaldo-Setup-Windows10-11-x64.exe
+          if-no-files-found: error
+          retention-days: 30
+
 
       - name: Publicar arquivo para download
         uses: actions/upload-artifact@v4
