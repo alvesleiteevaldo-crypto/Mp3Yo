@@ -12,6 +12,7 @@ import shutil
 import sys
 import threading
 import time
+import webbrowser
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from urllib.parse import urlparse, parse_qs
@@ -20,9 +21,9 @@ import yt_dlp
 
 
 FORMATS = ("mp3", "m4a", "opus", "flac", "wav")
-OUTPUT_TYPES = ("Áudio MP3", "Vídeo MP4", "Áudio avançado")
+OUTPUT_TYPES = ("Áudio MP3", "Vídeo MP4", "Vídeo AVI", "Vídeo MKV", "Vídeo MOV", "Áudio avançado")
 MP3_QUALITIES = ("192", "256", "320")
-MAX_LINKS = 100
+MAX_LINKS = 1000
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 CONFIG_DIR = Path(os.environ.get("APPDATA", Path.home())) / "YoutuberAudioDownloader"
 CONFIG = CONFIG_DIR / "config.json"
@@ -125,8 +126,15 @@ def authentication_options(browser, cookie_file):
     """Use only credentials explicitly selected by the user on this computer."""
     if browser == "Sem login":
         return {}
-    if browser in ("Chrome", "Edge", "Firefox"):
-        return {"cookiesfrombrowser": (browser.lower(),)}
+    browser_map = {
+        "Chrome": "chrome",
+        "Edge": "edge",
+        "Firefox": "firefox",
+        "Opera": "opera",
+        "Brave": "brave",
+    }
+    if browser in browser_map:
+        return {"cookiesfrombrowser": (browser_map[browser],)}
     if browser == "Arquivo cookies.txt":
         path = Path(cookie_file).expanduser()
         if not path.is_file() or path.suffix.lower() != ".txt":
@@ -205,11 +213,17 @@ def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=Non
         "no_warnings": True,
         "sleep_interval_requests": 1,
     }
-    if output_type == "Vídeo MP4":
+    if output_type.startswith("Vídeo "):
+        target = output_type.split()[-1].lower()
         options.update({
             "format": "bestvideo*+bestaudio/best",
-            "merge_output_format": "mp4",
+            "merge_output_format": "mkv" if target in ("avi", "mov") else target,
         })
+        if target in ("avi", "mov"):
+            options["postprocessors"] = [{
+                "key": "FFmpegVideoConvertor",
+                "preferedformat": target,
+            }]
     else:
         selected_audio_format = "mp3" if output_type == "Áudio MP3" else audio_format
         options.update({
@@ -237,7 +251,7 @@ class App:
         def label(text):
             tk.Label(frame, text=text, bg="#333333", fg="white", anchor="w").pack(fill="x")
 
-        label("Links de vídeos ou playlists do YouTube, TikTok e Facebook (até 100 links):")
+        label("Links de vídeos ou playlists do YouTube, TikTok e Facebook (até 1000 links):")
         self.links = tk.Text(frame, height=10, wrap="none")
         self.links.pack(fill="both", expand=True, pady=(5, 12))
         self.auto_clipboard = tk.BooleanVar(value=True)
@@ -281,14 +295,22 @@ class App:
         auth_row.pack(fill="x", pady=(4, 8))
         self.browser = tk.StringVar(value="Sem login")
         ttk.Combobox(auth_row, textvariable=self.browser,
-                     values=("Sem login", "Chrome", "Edge", "Firefox", "Arquivo cookies.txt"),
+                     values=("Sem login", "Chrome", "Edge", "Firefox", "Opera", "Brave", "Arquivo cookies.txt"),
                      state="readonly", width=21).pack(side="left")
         self.cookie_file = tk.StringVar()
         tk.Entry(auth_row, textvariable=self.cookie_file).pack(side="left", fill="x", expand=True, padx=6)
         tk.Button(auth_row, text="Escolher cookies.txt", command=self.select_cookies).pack(side="left")
         tk.Button(frame, text="Testar acesso ao primeiro vídeo", command=self.test_access).pack(
             fill="x", pady=(0, 7))
-        label("Entre no YouTube pelo navegador escolhido antes de iniciar; o arquivo de cookies é opcional.")
+        login_row = tk.Frame(frame, bg="#333333")
+        login_row.pack(fill="x", pady=(0, 7))
+        tk.Button(login_row, text="Entrar no YouTube",
+                  command=lambda: self.open_login("https://www.youtube.com/")).pack(side="left", expand=True, fill="x", padx=(0, 4))
+        tk.Button(login_row, text="Entrar no Facebook",
+                  command=lambda: self.open_login("https://www.facebook.com/")).pack(side="left", expand=True, fill="x", padx=4)
+        tk.Button(login_row, text="Entrar no TikTok",
+                  command=lambda: self.open_login("https://www.tiktok.com/login")).pack(side="left", expand=True, fill="x", padx=(4, 0))
+        label("Faça login no navegador escolhido; depois volte ao app. Cookies permanecem no navegador.")
         label("Pasta de destino:")
         folder_row = tk.Frame(frame, bg="#333333")
         folder_row.pack(fill="x", pady=(5, 12))
@@ -298,8 +320,7 @@ class App:
         self.start_button = tk.Button(frame, text="Converter links em sequência", bg="#006600",
                                       fg="white", command=self.start)
         self.start_button.pack(fill="x", pady=(0, 4))
-        tk.Button(frame, text="Minimizar e continuar em segundo plano",
-                  command=self.minimize).pack(fill="x", pady=(0, 10))
+        label("Ao minimizar a janela, o aplicativo continua automaticamente em segundo plano.")
         self.progress = ttk.Progressbar(frame, maximum=100)
         self.progress.pack(fill="x")
         self.status = tk.StringVar(value="Aguardando...")
@@ -314,6 +335,13 @@ class App:
         if self.running:
             self.report("Janela minimizada; a fila continua em segundo plano.")
         self.root.iconify()
+
+    def open_login(self, url):
+        try:
+            webbrowser.open_new_tab(url)
+            self.status.set("Navegador aberto para login. Depois de entrar, volte ao aplicativo.")
+        except Exception as exc:
+            messagebox.showerror("Login", f"Não foi possível abrir o navegador: {exc}")
 
     def poll_clipboard(self):
         try:
@@ -417,12 +445,12 @@ class App:
             messagebox.showwarning("Links", "Não encontrei links válidos do YouTube, TikTok ou Facebook no texto.")
             return
         if len(urls) > MAX_LINKS:
-            messagebox.showwarning("Links", "Informe no máximo 100 vídeos distintos.")
+            messagebox.showwarning("Links", "Informe no máximo 1000 vídeos distintos.")
             return
         self.links.delete("1.0", "end")
         self.links.insert("1.0", "\n".join(urls) + "\n")
         if self.output_type.get() not in OUTPUT_TYPES:
-            messagebox.showwarning("Formato", "Selecione Áudio MP3, Vídeo MP4 ou Áudio avançado.")
+            messagebox.showwarning("Formato", "Selecione um formato de saída válido.")
             return
         if self.output_type.get() == "Áudio avançado" and self.audio_format.get() not in FORMATS:
             messagebox.showwarning("Formato", "Selecione um formato de áudio válido.")
@@ -527,7 +555,7 @@ class App:
                         info = probe.extract_info(url, download=False)
                     video_id = info.get("id") if info else None
                 effective_audio_format = "mp3" if output_type == "Áudio MP3" else audio_format
-                found = None if output_type == "Vídeo MP4" else existing_audio(folder, video_id, effective_audio_format)
+                found = None if output_type.startswith("Vídeo ") else existing_audio(folder, video_id, effective_audio_format)
                 if found:
                     skipped += 1
                     self.root.after(0, lambda n=index, name=found.name: (
