@@ -17,6 +17,7 @@ from main_multisite import (
     App,
     MAX_LINKS,
     MP3_QUALITIES,
+    VIDEO_QUALITIES,
     optical_drives,
     media_files,
     audio_cd_tracks,
@@ -352,34 +353,40 @@ class ModernApp(App):
 
         tk.Label(left, text="Baixar como:", bg=PANEL, fg=TEXT).grid(row=1, column=0, sticky="w", pady=(10, 0))
         self.output_type = tk.StringVar(value="Áudio MP3")
-        ttk.Combobox(
+        self.output_box = ttk.Combobox(
             left,
             textvariable=self.output_type,
             values=("Áudio MP3", "Vídeo MP4", "Vídeo AVI", "Vídeo MKV", "Vídeo MOV"),
             state="readonly",
             width=16,
             style="Flux.TCombobox",
-        ).grid(row=1, column=1, sticky="w", padx=7, pady=(10, 0))
+        )
+        self.output_box.grid(row=1, column=1, sticky="w", padx=7, pady=(10, 0))
 
         self.audio_format = tk.StringVar(value="mp3")
-        tk.Label(left, text="Qualidade MP3:", bg=PANEL, fg=TEXT).grid(row=1, column=2, sticky="w", padx=(15, 0), pady=(10, 0))
+        self.quality_label = tk.Label(left, text="Qualidade MP3:", bg=PANEL, fg=TEXT)
+        self.quality_label.grid(row=1, column=2, sticky="w", padx=(15, 0), pady=(10, 0))
         self.mp3_quality = tk.StringVar(value="320")
-        ttk.Combobox(
+        self.video_quality = tk.StringVar(value="1080p")
+        self.quality_box = ttk.Combobox(
             left,
             textvariable=self.mp3_quality,
             values=MP3_QUALITIES,
             state="readonly",
-            width=8,
+            width=10,
             style="Flux.TCombobox",
-        ).grid(row=1, column=3, sticky="w", padx=7, pady=(10, 0))
+        )
+        self.quality_box.grid(row=1, column=3, sticky="w", padx=7, pady=(10, 0))
+        self.output_box.bind("<<ComboboxSelected>>", self._on_output_type_changed)
 
-        tk.Label(
+        self.download_hint = tk.Label(
             left,
-            text="ⓘ  Áudio MP3 usa MP3 automaticamente. Vídeos: MP4, AVI, MKV e MOV.",
+            text="ⓘ  Áudio MP3 usa MP3 automaticamente. Vídeos permitem escolher a resolução.",
             bg=PANEL,
             fg=MUTED,
             font=("Segoe UI", 8),
-        ).grid(row=2, column=0, columnspan=4, sticky="w", pady=(10, 0))
+        )
+        self.download_hint.grid(row=2, column=0, columnspan=4, sticky="w", pady=(10, 0))
 
         tk.Label(right, text="🔒  Acesso e login das plataformas:", bg=PANEL, fg=TEXT,
                  font=("Segoe UI", 10, "bold")).pack(anchor="w")
@@ -407,6 +414,24 @@ class ModernApp(App):
         self._button(login_row, "♪ TikTok", lambda: self.open_login("https://www.tiktok.com/login"), bg="#202a34").pack(side="left", expand=True, fill="x", padx=(3, 0))
 
         self._button(right, "Testar acesso ao primeiro vídeo", self.test_access, bg="#173047").pack(fill="x", pady=(7, 0))
+
+    def _on_output_type_changed(self, event=None):
+        if self.output_type.get().startswith("Vídeo "):
+            self.quality_label.config(text="Qualidade do vídeo:")
+            self.quality_box.config(textvariable=self.video_quality, values=VIDEO_QUALITIES)
+            if self.video_quality.get() not in VIDEO_QUALITIES:
+                self.video_quality.set("1080p")
+            self.download_hint.config(
+                text="ⓘ  Vídeo: escolha a resolução. No YouTube, playlists ficam desativadas neste modo."
+            )
+        else:
+            self.quality_label.config(text="Qualidade MP3:")
+            self.quality_box.config(textvariable=self.mp3_quality, values=MP3_QUALITIES)
+            if self.mp3_quality.get() not in MP3_QUALITIES:
+                self.mp3_quality.set("320")
+            self.download_hint.config(
+                text="ⓘ  Áudio MP3 usa MP3 automaticamente. Playlists do YouTube continuam disponíveis."
+            )
 
     def _destination_panel(self, parent):
         row = tk.Frame(parent, bg=BG)
