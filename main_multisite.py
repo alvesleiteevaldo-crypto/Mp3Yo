@@ -20,7 +20,7 @@ import yt_dlp
 
 
 FORMATS = ("mp3", "m4a", "opus", "flac", "wav")
-OUTPUT_TYPES = ("Áudio", "Vídeo MP4")
+OUTPUT_TYPES = ("Áudio MP3", "Vídeo MP4", "Áudio avançado")
 MP3_QUALITIES = ("192", "256", "320")
 MAX_LINKS = 100
 BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -195,7 +195,7 @@ def unique_links(urls):
     return result
 
 
-def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=None, output_type="Áudio"):
+def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=None, output_type="Áudio MP3"):
     options = {
         "noplaylist": True,
         "outtmpl": str(Path(folder) / "%(title).180B [%(id)s].%(ext)s"),
@@ -211,12 +211,13 @@ def options_for(folder, audio_format, progress_hook, mp3_quality="192", auth=Non
             "merge_output_format": "mp4",
         })
     else:
+        selected_audio_format = "mp3" if output_type == "Áudio MP3" else audio_format
         options.update({
             "format": "bestaudio/best",
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
-                "preferredcodec": audio_format,
-                "preferredquality": mp3_quality if audio_format == "mp3" else "0",
+                "preferredcodec": selected_audio_format,
+                "preferredquality": mp3_quality if selected_audio_format == "mp3" else "0",
             }],
         })
     options.update(auth or {})
@@ -262,10 +263,10 @@ class App:
         self.table.configure(yscrollcommand=scrollbar.set)
         row = tk.Frame(frame, bg="#333333")
         row.pack(fill="x")
-        tk.Label(row, text="Tipo:", bg="#333333", fg="white").pack(side="left")
-        self.output_type = tk.StringVar(value="Áudio")
+        tk.Label(row, text="Baixar como:", bg="#333333", fg="white").pack(side="left")
+        self.output_type = tk.StringVar(value="Áudio MP3")
         ttk.Combobox(row, textvariable=self.output_type, values=OUTPUT_TYPES,
-                     state="readonly", width=12).pack(side="left", padx=10)
+                     state="readonly", width=16).pack(side="left", padx=10)
         tk.Label(row, text="Formato de áudio:", bg="#333333", fg="white").pack(side="left")
         self.audio_format = tk.StringVar(value="mp3")
         ttk.Combobox(row, textvariable=self.audio_format, values=FORMATS,
@@ -274,7 +275,7 @@ class App:
         self.mp3_quality = tk.StringVar(value="192")
         ttk.Combobox(row, textvariable=self.mp3_quality, values=MP3_QUALITIES,
                      state="readonly", width=8).pack(side="left", padx=10)
-        label("192/256/320 kbps para MP3; outros formatos usam o melhor áudio disponível.")
+        label("Escolha Áudio MP3 ou Vídeo MP4. A opção Áudio avançado mantém M4A, OPUS, FLAC e WAV.")
         label("Acesso ao YouTube — selecione o navegador em que você fez login:")
         auth_row = tk.Frame(frame, bg="#333333")
         auth_row.pack(fill="x", pady=(4, 8))
@@ -420,7 +421,10 @@ class App:
             return
         self.links.delete("1.0", "end")
         self.links.insert("1.0", "\n".join(urls) + "\n")
-        if self.audio_format.get() not in FORMATS:
+        if self.output_type.get() not in OUTPUT_TYPES:
+            messagebox.showwarning("Formato", "Selecione Áudio MP3, Vídeo MP4 ou Áudio avançado.")
+            return
+        if self.output_type.get() == "Áudio avançado" and self.audio_format.get() not in FORMATS:
             messagebox.showwarning("Formato", "Selecione um formato de áudio válido.")
             return
         if self.mp3_quality.get() not in MP3_QUALITIES:
@@ -441,13 +445,16 @@ class App:
         self.start_button.config(state="disabled")
         self.progress.configure(value=0)
         self.table.delete(*self.table.get_children())
-        self.report(f"Lendo {len(urls)} link(s) em {self.output_type.get() if self.output_type.get() == 'Vídeo MP4' else self.audio_format.get().upper()}.")
+        selected_label = self.output_type.get()
+        if selected_label == "Áudio avançado":
+            selected_label = self.audio_format.get().upper()
+        self.report(f"Lendo {len(urls)} link(s) em {selected_label}.")
         self.report("Acesso selecionado: " + self.browser.get())
         threading.Thread(target=self.worker,
                          args=(urls, folder, self.audio_format.get(), binary,
                                self.mp3_quality.get(), auth, self.output_type.get()), daemon=True).start()
 
-    def worker(self, urls, folder, audio_format, binary, mp3_quality="192", auth=None, output_type="Áudio"):
+    def worker(self, urls, folder, audio_format, binary, mp3_quality="192", auth=None, output_type="Áudio MP3"):
         successes = 0
         failures = 0
         skipped = 0
@@ -508,7 +515,7 @@ class App:
                     self.root.after(0, lambda row=n-1: (
                         self.table.set(str(row), "progress", "99%"),
                         self.table.set(str(row), "status", "Convertendo"),
-                        self.status.set(f"{n}/{len(urls)}: finalizando {output_type if output_type == 'Vídeo MP4' else audio_format.upper()}...")))
+                        self.status.set(f"{n}/{len(urls)}: finalizando {output_type if output_type != 'Áudio avançado' else audio_format.upper()}...")))
 
             try:
                 video_id = known_video_id(url)
@@ -519,7 +526,8 @@ class App:
                                            **(auth or {})}) as probe:
                         info = probe.extract_info(url, download=False)
                     video_id = info.get("id") if info else None
-                found = None if output_type == "Vídeo MP4" else existing_audio(folder, video_id, audio_format)
+                effective_audio_format = "mp3" if output_type == "Áudio MP3" else audio_format
+                found = None if output_type == "Vídeo MP4" else existing_audio(folder, video_id, effective_audio_format)
                 if found:
                     skipped += 1
                     self.root.after(0, lambda n=index, name=found.name: (
