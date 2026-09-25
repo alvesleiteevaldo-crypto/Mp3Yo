@@ -80,7 +80,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pyinstaller yt-dlp pillow
           python "$PWD/tools/generate_fluxmidia_icon.py"
-          python -m py_compile "$PWD/main_multisite.py" "$PWD/disc_tools.py" "$PWD/fluxmidia_modern.py"
+          python -m py_compile "$PWD/main_multisite.py" "$PWD/disc_tools.py" "$PWD/fluxmidia_modern.py" "$PWD/social_media_backend.py"
           python -m PyInstaller --noconfirm --clean --onefile --windowed --name FluxMidia --icon "$PWD/app_icon.ico" --collect-all yt_dlp --add-binary "$PWD/package/utils/ffmpeg.exe;bin" "$PWD/fluxmidia_modern.py"
           Copy-Item "$PWD/dist/FluxMidia.exe" "$PWD/package/FluxMidia.exe" -Force
           Copy-Item "$PWD/dist/FluxMidia.exe" "$PWD/package/RedesSociaisDownloader.exe" -Force
@@ -102,6 +102,7 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item "$PWD/upstream/LICENSE" "$PWD/package/LICENSE-YoutubeDownloader-LGPL-2.1.txt"
+          Copy-Item "$PWD/third_party/LICENSE-Social-Media-Downloader-MIT.txt" "$PWD/package/LICENSE-Social-Media-Downloader-MIT.txt"
           @"
           Aplicativo baseado em:
           https://github.com/legend2ks/YoutubeDownloader
@@ -109,6 +110,9 @@ jobs:
 
           Customizações PT-BR, fila de até 1000 links, modulo YouTube/TikTok/Facebook e empacotamento portátil:
           https://github.com/alvesleiteevaldo-crypto/Mp3Yo/tree/integrar-youtubedownloader-portatil
+
+          TikTok e Facebook usam integração inspirada no projeto MIT:
+          https://github.com/nayandas69/Social-Media-Downloader
 
           Use apenas conteúdo que você tenha autorização para baixar.
           "@ | Set-Content "$PWD/package/CODIGO_FONTE_E_AVISO.txt" -Encoding UTF8
